@@ -1,0 +1,17 @@
+CACHE MANIFEST
+# v0.9
+
+CACHE:
+en
+profiles/gattai2.svg
+profiles/samurai.svg
+profiles/sohei.svg
+profiles/sudoku-16x16.png
+profiles/sudoku6.svg
+profiles/sudoku9.svg
+profiles/sudoku9x.svg
+scripts.js
+sudoku.css
+
+FALLBACK:
+/ /en

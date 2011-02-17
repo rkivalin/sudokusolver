@@ -1,0 +1,41 @@
+RewriteEngine on
+RewriteRule ^en$ index.en.html
+#RewriteRule ^ru$ index.ru.html
+RewriteRule ^scripts.js$ scripts_.js
+RewriteRule ^sudoku.css$ sudoku_.css
+RewriteRule ^profiles/samurai.svg$ profiles/samurai_.svg
+RewriteRule ^profiles/gattai2.svg$ profiles/gattai2_.svg
+RewriteRule ^profiles/sohei.svg$ profiles/sohei_.svg
+RewriteRule ^profiles/sudoku6.svg$ profiles/sudoku6_.svg
+RewriteRule ^profiles/sudoku9.svg$ profiles/sudoku9_.svg
+RewriteRule ^profiles/sudoku9x.svg$ profiles/sudoku9x_.svg
+RewriteRule ^v0.9.manifest$ v0.9_.manifest
+
+AddEncoding gzip .gz
+RewriteCond %{HTTP:Accept-encoding} gzip
+RewriteCond %{REQUEST_FILENAME}.gz -f
+RewriteRule ^(.*)$ $1.gz [QSA,L]
+
+<FilesMatch .*\.manifest$>
+    ForceType text/cache-manifest
+</FilesMatch>
+<FilesMatch .*\.js\.gz$>
+    ForceType text/javascript
+    Header set Content-Encoding: gzip
+    Header set Cache-control: private
+</FilesMatch>
+<FilesMatch .*\.css\.gz$>
+    ForceType text/css
+    Header set Content-Encoding: gzip
+    Header set Cache-control: private
+</FilesMatch>
+<FilesMatch .*\.svg\.gz$>
+    ForceType image/svg+xml
+    Header set Content-Encoding: gzip
+    Header set Cache-control: private
+</FilesMatch>
+<FilesMatch .*\.html\.gz$>
+    ForceType text/html
+    Header set Content-Encoding: gzip
+    Header set Cache-control: private
+</FilesMatch>
