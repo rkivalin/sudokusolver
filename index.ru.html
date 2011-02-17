@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ru" dir="ltr">
+<head>
+    <meta charset="utf-8">
+    <title>Решатель судоку</title>
+    <meta name="keywords" content="sudoku,solver,online,logic,interactive,судоку,решение,решатель,онлайн,логически">
+    <meta name="robots" content="index,follow">
+    <meta name="description" content="Онлайн решатель судоку. Поддерживает различные варианты судоку.">
+    <link rel="shortcut icon" type="image/x-icon" href="./favicon.ico">
+    <link rel="stylesheet" type="text/css" href="./black-tie-1.8.8/jquery-ui.css">
+    <link rel="stylesheet" type="text/css" href="./sudoku.css">
+    <script type="text/javascript" src="./jquery-1.4.4.js"></script>
+    <script type="text/javascript" src="./jquery-ui-1.8.8.js"></script>
+    <script type="text/javascript" src="./jquery-svg.js"></script>
+    <script type="text/javascript" src="./jquery-svgdom.js"></script>
+    <script type="text/javascript" src="./sudoku.js"></script>
+    <script type="text/javascript" src="./manager.js"></script>
+    <script>var lang = 'ru';</script>
+</head>
+<body>
+    <noindex><noscript><div>
+    Похоже, что в вашем браузере не работает JavaScript. Решатель судоку будет работать только со включённым JavaScript.<br>
+    Поодерживаемые браузеры:
+        <a href="http://www.google.ru/chrome">Google Chrome</a>,
+        <a href="http://www.mozilla.com/ru/">Firefox</a>,
+        <a href="http://www.opera.com/">Opera</a> последних версий.
+    </div></noscript></noindex>
+
+    <div id="sudoku"></div>
+    <div id="right">
+        <div id="control">
+<div id="tabs">
+    <ul>
+        <li><a href="#solving">Solving</a></li>
+        <li><a href="#options">Options</a></li>
+        <li><a href="#sudokutype">Sudoku type</a></li>
+    </ul>
+    <div id="solving">
+        <p><a href="/about/" id="about-toggle">About this program</a></p>
+        <p id="s_filled"></p>
+        <button id="showsteps">Show steps</button>
+        <button id="clear">Clear</button><br /><br />
+        <b>Guess and check: </b><button id="gnc-toggle">Start</button> <button id="gnc-reset">Reset</button><br /><br />
+        <button id="saveload">Save/Load</button>
+    </div>
+    <div id="options">
+        <form id="optionsform">
+        <div id="selectgrid"></div>
+        <label><input type="checkbox" id="diag_1"> main diagonal</label><br />
+        <label><input type="checkbox" id="diag_2"> anti diagonal</label><br />
+        </form>
+    </div>
+    <div id="sudokutype"></div>
+</div>
+        </div>
+        <!--nav>
+            <a href="./index.en.html" class="lang"><img src="./en.png" width="16" height="11" alt="en"></a>
+            <img class="active" src="./ru.png" width="16" height="11" alt="ru">
+        </nav-->
+    </div>
+    <!--div id="console"></div>
+    <div id="console-control"><span></span></div-->
+    <div id="notify" class="ui-state-highlight ui-corner-all"><span></span></div>
+    <div id="about" style="display: none;" title="О программе">
+sudoku sovler v&nbsp;0.8<br />
+© 2010 <a href="http://kivalin.ru/" target="_blank">Roman Kivalin</a>
+<p>v 0.8: UI changes, guess-and-check solver, using browsing history to restore lost (maybe occasionally) sudokus.</p>
+<p>
+TODO:
+<ul>
+    <li>improve UI and usability;</li>
+    <li>step by step solver;</li>
+    <li>return russian localization;</li>
+    <li>project homepage;</li>
+    <li>network optimizations.</li>
+</ul>
+</p>
+    </div>
+</body>
+</html>

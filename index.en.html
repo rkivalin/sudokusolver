@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" class="no-js">
+<head>
+    <meta charset="utf-8">
+    <title>Sudoku Solver</title>
+    <meta name="keywords" content="sudoku,solver,online,logic,interactive,diagonal">
+    <meta name="robots" content="index,follow">
+    <meta name="description" content="Online sudoku solver by logic. Supports different variations of the sudoku.">
+    <link rel="shortcut icon" type="image/x-icon" href="./favicon.ico">
+    <style>
+
+body {
+    font-family: Georgia, Arial;
+    overflow-y: scroll;
+    overflow-x: auto;
+    margin: 0;
+    padding: 0;
+}
+
+#loadscreen {
+    width: 100%;
+    height: 100%;
+    position: fixed;
+    top: 0;
+    left: 0;
+    background: #f3f3f3;
+    z-index: 1000;
+    font-size: 18px;
+    text-align: center;
+    padding-top: 100px;
+}
+
+#noscript, #loadtext, #loadbrowser {
+    display: none;
+}
+
+html.no-js #noscript {
+    display: inline-block;
+    background: #fff;
+    border: 1px solid red;
+    -o-border-radius: 5px;
+    -moz-border-radius: 5px;
+    -ms-border-radius: 5px;
+    border-radius: 5px;
+    padding: 15px;
+}
+
+html.js.svg #loadtext {
+    display: inline-block;
+    height: 20px;
+    padding-left: 22px;
+    background: no-repeat 0 50% url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAANiQAADYkBUJSCJQAAAzdJREFUOMtjYCAAFBQUzFXVVavU1NTCxcXFuRkoAVpaWhKGRobnLCwt%2FhmbGH80MDAIIdUMNgkJCU0hISE%2BECcnJ8fbydnpo6ub639HJ8f%2F0TGR05HUsgAxI06T5OXlOTQ0NObp6Oq81NTSPKaoqKh3%2FNxx1dLy0nthEWH%2F0zLSfs6aMysVZIiKioqMurq6rqKGohpIH1YDvfy87MwtzN%2FZ2dv9t7Sy%2FG%2FnYNcMEr909VLYrr07N5w8c7z2xtMbIsbGxlzaBtr6RuZGxrpGukCusSRWA5esWGLnH%2BgPNhDkxYaGumZs6jo7O3kdHR31dXV1jY2MjIwLCwulsRr46NEjzg2bNyztn9T3atGyRWePHj1qiE3d%2F%2F%2F%2FmZYvX6BcXl6oP2VKn%2Faq%2Fat4MBSBIkFYWFhq586d3O8%2Bv9P99OmZKL6YAxn6%2BvV13v%2F%2Fr7ABuaxAjAhHSTlJa2Vl5dPKKspP5OTkSqCxRxQARpw4MCIDgckrChSJ4FgHhsMifQP9%2F0bGRv%2BBMXzTytFKnVgDgRHiANSfamJukqavrx%2Fm4uLCz5CZk7nBzNwMbKCnt%2BeDadOmGRJrYEpGijvQQJBhaR4eHhGzZ88WYthzYE9g%2F8T%2BezV1Ne%2FWrF8z%2Ff7%2F%2BxzEGggMc8Wenp7Isoqy%2BDVr1livWrWKGRTAjK9evVJ79%2B6lzcSJE%2FmAEQTPKXgAo6ioKA8w7NjevXvH%2F%2FLLSwmgOczoijgkpSXnycrKvpSWkT4mJiamh8MwZmAuCdXW1u4ARkgRMCKxJ2xbR1s7FVWVd0BF%2F1VVVf8bGBlgTdj29vYKwEKi19zcfCYw3GdaWlr6YDVwwZIFdsDs9g6Yj8ERVFJWAjYQmKS0gXk3UVFF0RWUb6fNmaYOVNevq6c708jUaGZeYV4wzpyyau2qpS3tLa9mz5199sDRA4ZA1wpr62ovAVpwWk9P76CmpqbzrVu32BcvXZxVXFrcP2napMa9e%2Fcq4wxpkKHIOSUtLdEGmNYOAsvCM8AgOBMQFFAJEr9%2F%2Fz7Hq4%2Bv1D58eCREUuF46vIp2fTMtI3AMvFMaETo8UlTJwUwUAqAxZfL5m2be4%2BcPJICdJkAIfUAbx0uLE01doEAAAAASUVORK5CYII%3D");
+}
+
+html.no-svg #loadbrowser {
+    display: inline-block;
+    background: #fff;
+    border: 1px solid red;
+    -o-border-radius: 5px;
+    -moz-border-radius: 5px;
+    -ms-border-radius: 5px;
+    border-radius: 5px;
+    padding: 15px;
+}
+
+#b-chrome { background: url(b/chrome.gif) 50% 6px; }
+#b-safari { background: url(b/safari.gif) 50% 0; }
+#b-opera { background: url(b/opera.gif) 50% 7px; }
+#b-firefox { background: url(b/firefox.gif) 50% 7px; }
+#loadbrowser a {
+    display: inline-block;
+    width: 105px;
+    height: 20px;
+    padding: 80px 0px 7px;
+    background-repeat: no-repeat;
+    font-size: 14px;
+    margin-top: 15px;
+}
+
+#panel, #left, #help {
+    display: none;
+}
+
+    </style>
+    <script type="text/javascript" src="./modernizr.js"></script>
+    <script>
+
+var lang = 'en';
+
+Modernizr.load({
+    test: Modernizr.svg,
+    yep: ["./sudoku.css",
+        "./jquery-1.4.4.js", "./jquery-svg.js", "./jquery-svgdom.js",
+        "./sudoku.js", "./manager.js"]
+});
+
+    </script>
+</head>
+<body>
+
+    <noindex><div id="loadscreen">
+        <div><div id="loadtext">Loading</div></div>
+        <div><noscript><div id="noscript">
+            Looks like your browser does not support JavaScript. Sudoku Solver will not work.<br />
+            Supported browsers: latest versions of
+            <a href="http://www.google.ru/chrome">Google Chrome</a>,
+            <a href="http://www.mozilla.com/">Firefox</a>,
+            <a href="http://www.opera.com/">Opera</a>.
+        </div></noscript></div>
+        <div><div id="loadbrowser">
+            Seems like your browser does not support SVG. Please use HTML5-compatible browser, such as:<br />
+            <a href="http://www.google.com/chrome/" target="_blank" id="b-chrome">Google Chrome</a>
+            <a href="http://www.apple.com/safari/" target="_blank" id="b-safari">Safari</a>
+            <a href="http://www.opera.com/" target="_blank" id="b-opera">Opera</a>
+            <a href="http://www.mozilla-europe.org/" target="_blank" id="b-firefox">Firefox</a>
+        </div></div>
+    </div></noindex>
+
+    <nav id="panel" class="panel">
+        <input type="checkbox" id="left-toggle" tabindex="-1" class="hidden" />
+        <div class="elem">
+            <div class="label"><span class="labeltext">Select Sudoku</span></div>
+        </div>
+        <input type="checkbox" class="hidden checkboxon" id="stats_c" />
+        <div class="elem dropdown" id="stats">
+            <div class="label"><span class="labeltext">Statistics</span></div>
+            <div class="ddnode">no info</div>
+        </div>
+        <button class="elem" id="clear" accesskey="c" />
+            <div class="label"><span class="labeltext">Clear</span></div>
+        </button>
+        <button class="elem" id="showsteps" />
+            <div class="label"><span class="labeltext" accesskey="s">Show steps</span></div>
+        </button>
+        <input type="checkbox" class="hidden checkboxon" id="gnc_c" />
+        <div class="elem dropdown" id="gnc">
+            <div class="label"><span class="labeltext">Guess and check</span></div>
+            <div class="ddnode">
+                <button id="gnc-toggle" tabindex="-1" accesskey="g">&#9656; Start</button>
+                <button id="gnc-reset" tabindex="-1" accesskey="r">Reset</button>
+            </div>
+        </div>
+        <input type="checkbox" class="hidden checkboxon" id="saveload_c" />
+        <div class="elem dropdown" id="saveload">
+            <div class="label"><span class="labeltext">Save/Load</span></div>
+            <div class="ddnode">
+                <p>
+                    Export:
+                    <label><input type="checkbox" id="export_url" tabindex="-1" /> url</label>&ensp;
+                    <label><input type="checkbox" id="export_map" checked tabindex="-1" /> map</label>&ensp;
+                    <label><input type="checkbox" id="export_data" checked tabindex="-1" /> data</label><br />
+                    <input type="text" id="export_txt" readonly="true" tabindex="-1" /><input type="button" value="Copy" tabindex="-1" disabled />
+                </p>
+                <p>
+                    Solution:<br />
+                    <input type="text" id="solution_txt" readonly="true" tabindex="-1" /><input type="button" value="Copy" tabindex="-1" disabled />
+                </p>
+                <p>
+                    Import:<br />
+                    <form id="import"><input type="text" id="import_txt" tabindex="-1" /><input type="submit" value="Load" tabindex="-1" /></form>
+                </p>
+            </div>
+        </div>
+        <button class="elem right first" id="help-toggle" />
+            <div class="label"><span class="labeltext">Help</span></div>
+        </button>
+        <div class="elem right dropdown" id="messages" tabindex="-1">
+            <div class="label"><span class="labeltext">Messages</span></div>
+            <div class="ddnode">no messages</div>
+        </div>
+    </nav>
+
+    <div id="left">
+        <form id="left-tabs">
+        <nav class="panel">
+            <input type="radio" name="tab" class="hidden" value="6x6" />
+            <div class="elem"><div class="label"><span class="labeltext">6x6</span></div></div>
+            <input type="radio" name="tab" class="hidden" value="9x9" checked />
+            <div class="elem"><div class="label"><span class="labeltext">9x9</span></div></div>
+            <input type="radio" name="tab" class="hidden" value="12x12" />
+            <div class="elem"><div class="label"><span class="labeltext">12x12</span></div></div>
+            <input type="radio" name="tab" class="hidden" value="16x16" />
+            <div class="elem"><div class="label"><span class="labeltext">16x16</span></div></div>
+            <input type="radio" name="tab" class="hidden" value="25x25" />
+            <div class="elem"><div class="label"><span class="labeltext">25x25</span></div></div>
+            <input type="radio" name="tab" class="hidden" value="options" />
+            <div class="elem" style="clear: left;"><div class="label"><span class="labeltext">Options</span></div></div>
+            <input type="radio" name="tab" class="hidden" value="custom" />
+            <div class="elem"><div class="label"><span class="labeltext">Custom</span></div></div>
+        </nav>
+        </form>
+        <div id="options">
+            <form id="optionsform">
+            <div id="selectgrid"></div>
+            <label><input type="checkbox" id="diag_1"> main diagonal</label><br />
+            <label><input type="checkbox" id="diag_2"> anti diagonal</label><br />
+            </form>
+        </div>
+        <div id="sudokutype"></div>
+    </div>
+
+    <div id="sudoku"></div>
+
+    <div id="help">
+<div id="helpnode">
+<div id="helptext">
+sudoku sovler v&nbsp;0.9<br />
+© 2010 <a href="http://kivalin.ru/" target="_blank">Roman Kivalin</a>
+<p>v 0.9: UI changes, show error message for no-svg-browser or no-js-browser users, network optimizations.</p>
+<p>
+TODO:
+<ul>
+    <li>improve UI and usability;</li>
+    <li>step by step solver;</li>
+    <li>return russian localization;</li>
+    <li>project homepage;</li>
+    <li>improve guess-and-check solver;</li>
+    <li>review program logic;</li>
+    <li>keyboard input.</li>
+</ul>
+</p>
+<button id="helpclose">Close</button>
+</div>
+</div>
+    </div>
+</body>
+</html>

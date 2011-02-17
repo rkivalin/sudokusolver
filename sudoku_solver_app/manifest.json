@@ -1,0 +1,17 @@
+{
+  "name": "Sudoku Solver",
+  "description": "Solve different variations of sudoku",
+  "version": "0.1",
+  "app": {
+    "urls": [
+      "http://sudokusolver.tk/ru",
+      "http://sudokusolver.tk/en"
+    ],
+    "launch": {
+      "web_url": "http://sudokusolver.tk/"
+    }
+  },
+  "icons": {
+    "128": "icon_128.png"
+  }
+}

@@ -1,0 +1,3 @@
+RewriteEngine on
+RewriteRule ^en$ index.en.html
+RewriteRule ^ru$ index.ru.html
