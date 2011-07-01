@@ -1,5 +1,5 @@
 CACHE MANIFEST
-# v0.9
+# v0.9.1
 
 CACHE:
 en
@@ -10,8 +10,8 @@ profiles/sudoku-16x16.png
 profiles/sudoku6.svg
 profiles/sudoku9.svg
 profiles/sudoku9x.svg
-scripts.js
-sudoku.css
+scripts091.js
+sudoku091.css
 
 FALLBACK:
 / /en
