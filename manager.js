@@ -115,7 +115,7 @@ $(function () {
     var html = "";
     for (var i = 0; i < profiles.length; i++) {
         var title = profiles[i].title[lang] || profiles[i].title.en;
-        html += "<div id=\"" + i + "\" data-size=\"" + profiles[i].s
+        html += "<div id=\"" + i + "\" data-size=\"" + (profiles[i].s == 9 ? profiles[i].s : "other")
             + "\" title=\"" + title + "\"><a href=\"#" + profiles[i].map + "\"><img src=\"./profiles/"
             + profiles[i].img + "\" width=\"100\" height=\"100\"><br />"
             + title + "</a></div>";
@@ -175,7 +175,7 @@ $(function () {
             s.hide_grid_id();
             $("#options").add("#custom").css({display: 'none'});
             $("#sudokutype > div").css({display: 'none'});
-            $("#sudokutype > div[data-size=" + parseInt(this.value) + "]").css({display: 'block'});
+            $("#sudokutype > div[data-size=" + this.value + "]").css({display: 'block'});
             $("#sudokutype").css({display: 'block'});
         }
     }).filter(":checked").click();
@@ -296,20 +296,25 @@ $(function () {
 
     //// Sudoku events
 
-    s.bind('update', function (s) { // optimizeable
+    s.bind('stats', function () { // optimizeable
         $("#stats .labeltext")
-            .html("Filled: " + s.filled + "/" + s.total + " &mdash; " + Math.floor(100 * s.filled / s.total) + "&nbsp;%");
+            .html("Filled: " + this.filled + "/" + this.total + " &mdash; " + Math.floor(100 * this.filled / this.total) + "&nbsp;%");
         $("#stats .ddnode")
             .html(
-                "<p>Givens: " + s.ufilled + "/" + s.total + " &mdash; " + Math.floor(100 * s.ufilled / s.total) + "&nbsp;%</p>" +
-                (s.state ? "<p class=\"errors\">there are errors</p>" : "")
+                "<p>Givens: " + this.ufilled + "/" + this.total + " &mdash; " + Math.floor(100 * this.ufilled / this.total) + "&nbsp;%</p>" +
+                (this.state ? "<p class=\"errors\">there are errors</p>" : "")
             );
-        if (s.state) {
+        if (this.state) {
             $("#stats").addClass("red");
         } else {
             $("#stats").removeClass("red");
         }
-        var e = s.export_all();
+        var pre = (edata.url ? location.protocol + "//" + location.hostname + location.pathname + "#" : "")
+            + (edata.map ? edata.txtmap : "");
+        $("#solution_txt").val(pre + (edata.data ? this.export_solution() : ""));
+    }).bind('update', function () {
+        var e = this.export_all();
+        edata.txtmap = e.map;
         edata.txt = e.map + e.data;
         edata.solution = e.map + e.solution;
         localStorage.restore = edata.txt;
@@ -318,40 +323,41 @@ $(function () {
             + (edata.map ? e.map : "");
         $("#export_txt").val(pre + (edata.data ? e.data : ""));
         $("#solution_txt").val(pre + (edata.data ? e.solution : ""));
-    }).bind('load', function (s) {
-        var html = "";
-        if (s.grids.length > 1) {
+    }).bind('load', function () {
+        console.log(this);
+        var html = "", t = this;
+        if (this.grids.length > 1) {
             var html = "Configure grid: ";
-            for (var i = 0; i < s.grids.length; i++) {
+            for (var i = 0; i < this.grids.length; i++) {
                 html += '<label><input type="radio" id="selectgrid' + i
                     + '" name="selectgrid" value="' + i + '"'
-                    + (s.grids[i] === s.agrid ? ' checked' : '')
+                    + (this.grids[i] === this.agrid ? ' checked' : '')
                     + ' />' + (1+i) + '</label>&ensp;';
             }
         }
         $("#selectgrid").html(html);
         $("#diag_1")
-            .attr("disabled", !s.agrid)
-            .attr("checked", !!(s.agrid && s.gethouse(3, s.agrid)));
+            .attr("disabled", !this.agrid)
+            .attr("checked", !!(this.agrid && this.gethouse(3, this.agrid)));
         $("#diag_2")
-            .attr("disabled", !s.agrid)
-            .attr("checked", !!(s.agrid && s.gethouse(4, s.agrid)));
-        $("#selectgrid input[name=selectgrid]").click(function () { s.select_grid(this.value); });
-        if ($("#left").hasClass("opened") && $("#left-tabs input:checked").val() === "options" && s.grids.length > 1) {
-            s.show_grid_id();
+            .attr("disabled", !this.agrid)
+            .attr("checked", !!(this.agrid && this.gethouse(4, this.agrid)));
+        $("#selectgrid input[name=selectgrid]").click(function () { t.select_grid(this.value); });
+        if ($("#left").hasClass("opened") && $("#left-tabs input:checked").val() === "options" && this.grids.length > 1) {
+            this.show_grid_id();
         }
-    }).bind('select_grid', function (s) {
+    }).bind('select_grid', function () {
         $("#diag_1")
-            .attr("disabled", !s.agrid)
-            .attr("checked", !!(s.agrid && s.gethouse(3, s.agrid)));
+            .attr("disabled", !this.agrid)
+            .attr("checked", !!(this.agrid && this.gethouse(3, this.agrid)));
         $("#diag_2")
-            .attr("disabled", !s.agrid)
-            .attr("checked", !!(s.agrid && s.gethouse(4, s.agrid)));
-        if (s.agrid) {
-            $("#selectgrid" + s.agrid.id).attr("checked", true);
+            .attr("disabled", !this.agrid)
+            .attr("checked", !!(this.agrid && this.gethouse(4, this.agrid)));
+        if (this.agrid) {
+            $("#selectgrid" + this.agrid.id).attr("checked", true);
         }
-    }).bind('gnc_state', function (s) {
-        $("#gnc-toggle").html(s.gnc ? "&#9724; Stop" : "&#9656; Start");
+    }).bind('gnc_state', function () {
+        $("#gnc-toggle").html(this.gnc ? "&#9724; Stop" : "&#9656; Start");
     });
 
     /// Initialize sudoku
@@ -371,16 +377,16 @@ $(function () {
                 load_sudoku("");
             },
             s2);
-    }
-    else if (localStorage.restore) {
+    } else if (localStorage.restore) {
         s.import_txt(localStorage.restore);
         notify(
             "Loading sudoku from storage. (<a href=\"#\">Load default sudoku</a>)",
             function () {
                 load_sudoku("");
             });
+    } else {
+        s.import_txt("");
     }
-    else s.import_txt("");
 
     // keyboard shortcuts
     $(document).keydown(function (e) {

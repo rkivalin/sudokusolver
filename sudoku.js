@@ -1,48 +1,60 @@
 
 function array(dim, value, level) {
     var i, arr = [];
-    if (level === void 0) { level = 0; } else level = ~~level;
-    if (typeof (dim) === 'number') for (i = 0; i < dim; i++) { arr[i] = value; }
-    else if (dim.length === 1+level) for (i = 0; i < dim[level]; i++) { arr[i] = value; }
-    else for (i = 0; i < dim[level]; i++) { arr[i] = array(dim, value, level + 1); }
+    level = (level === void 0) ? 0 : ~~level;
+    if (typeof (dim) === 'number') {
+        for (i = 0; i < dim; i++) {
+            arr[i] = value;
+        }
+    } else if (dim.length === 1+level) {
+        for (i = 0; i < dim[level]; i++) {
+            arr[i] = value;
+        }
+    } else {
+        for (i = 0; i < dim[level]; i++) {
+            arr[i] = array(dim, value, level + 1);
+        }
+    }
     return arr;
 }
 
 function array_del(arr, index) {
-    if (+index >= arr.length) return;
-    for (var i = +index + 1; i < arr.length; i++)
+    if (+index >= arr.length) {
+        return;
+    }
+    for (var i = +index + 1; i < arr.length; i++) {
         arr[i - 1] = arr[i];
+    }
     arr.pop();
 }
 
 function array_del_value(arr, value) {
-    for (var i = 0; i < arr.length; i++)
-        if (arr[i] == value)
-            array_del(arr, i--);
+    for (var i = 0; i < arr.length; i++) if (arr[i] === value) {
+        array_del(arr, i--);
+    }
 }
 
-function str_pad(input, pad_length, pad_string, pad_type) {   // Pad a string to a certain length with another string
-    //
-    // +   original by: Kevin van Zonneveld (http://kevin.vanzonneveld.net)
-    // + namespaced by: Michael White (http://crestidg.com)
-
+function str_pad(input, pad_length, pad_string, pad_type) {
     var half = '', pad_to_go;
 
     var str_pad_repeater = function(s, len) {
-            var collect = '', i;
+        var collect = '', i;
 
-            while(collect.length < len) collect += s;
-            collect = collect.substr(0,len);
+        while (collect.length < len) {
+            collect += s;
+        }
+        collect = collect.substr(0, len);
 
-            return collect;
-        };
+        return collect;
+    };
 
-    if (pad_type != 'STR_PAD_LEFT' && pad_type != 'STR_PAD_RIGHT' && pad_type != 'STR_PAD_BOTH')
+    if (pad_type !== 'STR_PAD_LEFT' && pad_type !== 'STR_PAD_RIGHT' && pad_type !== 'STR_PAD_BOTH') {
         pad_type = 'STR_PAD_RIGHT';
+    }
     if ((pad_to_go = pad_length - input.length) > 0) {
-        if (pad_type == 'STR_PAD_LEFT') { input = str_pad_repeater(pad_string, pad_to_go) + input; }
-        else if (pad_type == 'STR_PAD_RIGHT') { input = input + str_pad_repeater(pad_string, pad_to_go); }
-        else if (pad_type == 'STR_PAD_BOTH') {
+        if (pad_type === 'STR_PAD_LEFT') { input = str_pad_repeater(pad_string, pad_to_go) + input; }
+        else if (pad_type === 'STR_PAD_RIGHT') { input = input + str_pad_repeater(pad_string, pad_to_go); }
+        else if (pad_type === 'STR_PAD_BOTH') {
             half = str_pad_repeater(pad_string, Math.ceil(pad_to_go/2));
             input = half + input + half;
             input = input.substr(0, pad_length);
@@ -53,42 +65,26 @@ function str_pad(input, pad_length, pad_string, pad_type) {   // Pad a string to
 }
 
 function str_repeat(str, mul) {
-    for (var i = 0, ret = ''; i < mul; i++) ret += str;
+    for (var i = 0, ret = ''; i < mul; i++) {
+        ret += str;
+    }
     return ret;
 }
 
-function json_dump(v, limit) {
-    switch (typeof v) {
-      case "boolean": case "number": return v;
-      case "string": return '"' + v + '"';
-      case "object":
-        if (limit === 0) return "obj";
-        if (v == null) return 'null';
-        if (v instanceof Array) {
-            var map = [], i;
-            for (i = 0; i < v.length; i++)
-                map.push(json_dump(v[i], limit - 1));
-            return "[" + map.join(",") + "]";
-        }
-        var props = [];
-        for (var prop in v) // if (v.hasOwnProperty(prop))
-            try { props.push(prop + ':' + json_dump(v[prop], limit - 1)); }
-            catch (e) { props.push(prop); };
-        return "{" + props.join(",") + "}";
-    }
-}
-
 function is_integer() {
-    for (var i = 0; i < arguments.length; i++)
-        if (typeof arguments[i] !== 'number' || Math.ceil(arguments[i]) !== arguments[i]) {
+    for (var i = 0; i < arguments.length; i++) if (typeof arguments[i] !== 'number'
+        || Math.ceil(arguments[i]) !== arguments[i]) {
         return false;
     }
     return true;
 }
 
-function sudoku(rootnode) {
+function sudoku(rootnode, cfg) {
     if (rootnode === void 0) {
         rootnode = $();
+    }
+    if (cfg === void 0) {
+        cfg = {};
     }
 
     this.rootnode = rootnode;
@@ -133,24 +129,144 @@ function sudoku(rootnode) {
     this.letters = 1; // maximum number of letters used in sudoku symbols
 
     this.update_w = {};
-    this.on_update = [];
-    this.on_load = [];
+    this.on_stats = []; // this.filled, errors
+    this.on_update = []; // this.ufilled, this.houses, this.sym,
+    this.on_load = []; // this.load_map()
     this.on_select_grid = [];
+    this.on_select_cell = [];
     this.on_gnc_state = [];
     this.aftersolve = [];
     this.gnc = false;
     this.gnc_speed = 100;
+
+    this.kbd_state = false;
+    this.kbd_ev = false;
+
+    if (this.interactive && cfg.keyboard !== false) {
+        this.keyboard(true);
+    }
+
 }
 
+sudoku.prototype.select_next = function () {
+    var x = this.mx + (this.acell ? this.acell.x : -1), y = this.my + (this.acell ? this.acell.y : -1), limit = this.mx * this.my;
+    do {
+        x += 1;
+        if (x % this.mx === 0) {
+            y += 1;
+        }
+        limit -= 1;
+    } while (limit && (!this.m[x % this.mx][y % this.my] || this.m[x % this.mx][y % this.my].digit));
+    if (limit === 0) {
+        this.select_cell(false);
+    } else {
+        this.select_cell(this.m[x % this.mx][y % this.my]);
+    }
+};
+
+sudoku.prototype.keyboard = function (state) {
+    if (arguments.length === 0) {
+        return this.kbd_state;
+    }
+    if (state === false && this.kbd_state) {
+        // turn it off
+        $(document).unbind("." + this.kbd_ev);
+        this.kbd_state = false;
+        if (this.rendered) {
+            $(this.gr.cells).removeClass("keyboard");
+        }
+    }
+    if (state === true && !this.kbd_state) {
+        // turn it on
+        if (!this.interactive) {
+            /* TODO: error handling */
+            return this;
+        }
+        this.kbd_ev = '';
+        for (var i = 0; i < 8; i += 1) {
+            this.kbd_ev += String.fromCharCode('a'.charCodeAt(0) + Math.floor(Math.random()*26));
+        }
+        var t = this;
+        var step = function (v) {
+            var x = t.mx + (t.acell ? t.acell.x : -v), y = t.my + (t.acell ? t.acell.y : -v);
+            do {
+                x += v;
+                if (x % t.mx === (v < 0 ? t.mx - 1 : 0)) {
+                    x += t.mx;
+                    y += v;
+                }
+            } while (!t.m[x % t.mx][y % t.my]);
+            t.select_cell(t.m[x % t.mx][y % t.my]);
+        };
+        var move = function (coord, v) {
+            if (!t.acell) {
+                step(1);
+                return;
+            }
+            var c = {x: t.mx + t.acell.x, y: t.my + t.acell.y};
+            c[coord] += v;
+            while (!t.m[c.x % t.mx][c.y % t.my]) {
+                c[coord] += v;
+            }
+            t.select_cell(t.m[c.x % t.mx][c.y % t.my]);
+        };
+        $(document).bind("keydown." + this.kbd_ev, function (e) {
+            if (typeof e.target.form === "object" ||  // if target is form element
+                e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) {
+                return;
+            }
+            if (49 <= e.keyCode && e.keyCode <= 69) { // 1-9 a-
+                t.select(t.acell, e.keyCode - 48, 'user');
+            } else if (97 <= e.keyCode && e.keyCode <= 105) { // 1-9 keypad
+                t.select(t.acell, e.keyCode - 96, 'user');
+            } else if (e.keyCode === 8) { // backspace
+                step(-1);
+                t.cancel(t.acell, 'user');
+            } else if (e.keyCode === 46) { // delete
+                t.cancel(t.acell, 'user');
+                if (!t.acell.digit) {
+                    t.show_selector();
+                }
+            } else if (e.keyCode === 32) { // space
+                t.select_next();
+            } else if (e.keyCode === 37) { // left
+                move('x', -1);
+            } else if (e.keyCode === 38) { // up
+                move('y', -1);
+            } else if (e.keyCode === 39) { // right
+                move('x', 1);
+            } else if (e.keyCode === 40) { // down
+                move('y', 1);
+            } else {
+                console.log('down', e.keyCode, e);
+                return;
+            }
+            return false;
+        });
+        this.kbd_state = true;
+        if (this.rendered) {
+            $(this.gr.cells).addClass("keyboard");
+        }
+    }
+    return this;
+}
+
+
 sudoku.prototype.bind = function (type, f) {
+    if (!this.hasOwnProperty('on_' + type)) {
+        /* TODO: error handling */
+        return this;
+    }
     if (this.hasOwnProperty('on_' + type)) {
         this['on_' + type].push(f);
-    } else {
-        /* TODO: error handling */
     }
     return this;
 }
 sudoku.prototype.unbind = function (type, f) {
+    if (!this.hasOwnProperty('on_' + type)) {
+        /* TODO: error handling */
+        return this;
+    }
     if (f === void 0) {
         this['on' + type] = [];
     } else {
@@ -159,14 +275,27 @@ sudoku.prototype.unbind = function (type, f) {
     return this;
 }
 sudoku.prototype.toggle = function (type) {
-    if (this.hasOwnProperty('on_' + type)) {
-        for (var i = 0; i < this['on_' + type].length; i++) {
-            this['on_' + type][i](this);
-        }
-    } else {
+    if (!this.hasOwnProperty('on_' + type)) {
         /* TODO: error handling */
+        return this;
+    }
+    for (var i = 0; i < this['on_' + type].length; i++) {
+        this['on_' + type][i].call(this);
     }
     return this;
+}
+
+sudoku.prototype.export_solution = function () {
+    var e = "", x, y, cell, num = 0;
+    for (y = 0; y < this.my; y++) for (x = 0; x < this.mx; x++) if (cell = this.m[x][y]) {
+        if (cell.digit) {
+            e += str_repeat('.', num) + str_pad(this.sym[cell.digit], this.letters, "_", 'STR_PAD_LEFT');
+            num = 0;
+        } else {
+            num++;
+        }
+    }
+    return e;
 }
 
 sudoku.prototype.export_all = function () {
@@ -251,6 +380,79 @@ sudoku.prototype.import_txt = function (data) {
     return this.load_map(map);
 }
 
+sudoku.prototype.show_selector = function () {
+    if (!(this.interactive && this.rendered)) {
+        return this;
+    }
+    if (this.timers.selector) {
+        clearTimeout(this.timers.selector);
+        this.timers.selector = false;
+    }
+    var nx, ny, node;
+    for (var k = 0; k < this.s; k++) {
+        if (this.acell.cand[1 + k] || this.acell.mask[1 + k]) {
+            $(this.gr.selector.childNodes[k]).addClass("disabled");
+        } else {
+            $(this.gr.selector.childNodes[k]).removeClass("disabled");
+        }
+    }
+    nx = this.acell.g.x + 0.5*(this.g.cell_w - this.g.sel_tw);
+    ny = this.acell.g.y + 0.5*(this.g.cell_h - this.g.sel_th);
+    if (nx + this.g.sel_tw > this.g.canv_w) {
+        nx = this.g.canv_w - this.g.sel_tw;
+    }
+    if (ny + this.g.sel_th > this.g.canv_h) {
+        ny = this.g.canv_h - this.g.sel_th;
+    }
+    if (nx < 0) {
+        nx = 0;
+    }
+    if (ny < 0) {
+        ny = 0;
+    }
+    $(this.gr.selector).attr("transform", "translate("+nx+","+ny+")").show();
+    this.gr.selector.scrollIntoViewIfNeeded();
+    return this;
+}
+
+sudoku.prototype.is_cell = function (cell) {
+    try {
+        return this.m[cell.x][cell.y] === cell;
+    } catch (e) {
+        return false;
+    }
+}
+
+sudoku.prototype.select_cell = function (cell) {
+    if (!this.interactive) {
+        /* error handling */
+        return this;
+    }
+    if (!this.is_cell(cell) && cell !== false) {
+        /* error handling */
+        return this;
+    }
+    var oldcell = this.acell;
+    this.acell = cell;
+    if (this.rendered) {
+        if (oldcell !== false) {
+            $(oldcell.g.node).removeClass("active");
+        }
+        if (this.acell !== false) {
+            $(this.acell.g.node).addClass("active");
+            if (!this.acell.digit) {
+                this.show_selector();
+            } else {
+                this.selector_hide(true);
+            }
+        } else {
+            this.selector_hide(true);
+        }
+    }
+    this.toggle('select_cell');
+    return this;
+}
+
 sudoku.prototype.cell_click = function (el, e, cell) {
     if (e.ctrlKey || e.altKey || e.shiftKey || e.metaKey) {
         return;
@@ -260,34 +462,7 @@ sudoku.prototype.cell_click = function (el, e, cell) {
     } else if (cell.digit) {
         this.cancel(cell, 'user');
     } else {
-        if (this.timers.selector) {
-            clearTimeout(this.timers.selector);
-            this.timers.selector = false;
-        }
-        var nx, ny, node;
-        for (var k = 0; k < this.s; k++) {
-            if (cell.cand[1 + k] || cell.mask[1 + k]) {
-                $(this.gr.selector.childNodes[k]).addClass("disabled");
-            } else {
-                $(this.gr.selector.childNodes[k]).removeClass("disabled");
-            }
-        }
-        this.acell = cell;
-        nx = cell.g.x + this.g.cell_w / 2 - this.g.sel_tw * 0.5;
-        ny = cell.g.y + this.g.cell_h / 2 - this.g.sel_th * 0.5;
-        if (nx + this.g.sel_tw > this.g.canv_w) {
-            nx = this.g.canv_w - this.g.sel_tw;
-        }
-        if (ny + this.g.sel_th > this.g.canv_h) {
-            ny = this.g.canv_h - this.g.sel_th;
-        }
-        if (nx < 0) {
-            nx = 0;
-        }
-        if (ny < 0) {
-            ny = 0;
-        }
-        $(this.gr.selector).attr("transform", "translate("+nx+","+ny+")").show();
+        this.select_cell(cell);
     }
 }
 
@@ -308,7 +483,9 @@ sudoku.prototype.selector_click_f = function (kk) {
 }
 
 sudoku.prototype.unload = function () {
-    if (this.gnc) this.gnc_stop();
+    if (this.gnc) {
+        this.gnc_stop();
+    }
     this.aftersolve = [];
     for (var i in this.timers) if (this.timers[i]) {
         clearTimeout(this.timers[i]);
@@ -352,7 +529,7 @@ sudoku.prototype.load_sym = function (s) {
             }
         }
     }
-    this.upd('state');
+    this.upd('update');
 }
 
 sudoku.prototype.load_map = function (map) {
@@ -448,53 +625,65 @@ sudoku.prototype.load_map = function (map) {
             this.addhouse(2, grid, i); // boxes
         }
     }
-    for (var i = 0; i < this.mx; i++) for (var j = 0; j < this.my; j++) if (this.m[i][j]) {
-        this.acell = this.m[i][j];
-        i = this.mx;
+    for (var j = 0; j < this.my; j++) for (var i = 0; i < this.mx; i++) if (this.m[i][j]) {
+        this.select_cell(this.m[i][j]);
+        j = this.my; // break 2 levels
         break;
     }
     this.agrid = this.grids[0];
 
-    if (map.houses) try {
-        for (var i = 0; i < map.houses.length; i++) {
-            switch (map.houses[i].type) {
-              case 3:
-                if (!this.grids[map.houses[i].grid]) break;
-                this.addhouse(3, this.grids[map.houses[i].grid]);
-                break;
-              case 4:
-                if (!this.grids[map.houses[i].grid]) break;
-                this.addhouse(4, this.grids[map.houses[i].grid]);
-                break;
+    if (map.houses) {
+        try {
+            for (var i = 0; i < map.houses.length; i++) {
+                switch (map.houses[i].type) {
+                  case 3:
+                    if (!this.grids[map.houses[i].grid]) {
+                        break;
+                    }
+                    this.addhouse(3, this.grids[map.houses[i].grid]);
+                    break;
+                  case 4:
+                    if (!this.grids[map.houses[i].grid]) {
+                        break;
+                    }
+                    this.addhouse(4, this.grids[map.houses[i].grid]);
+                    break;
+                }
             }
-        }
-    } catch (e) {};
+        } catch (e) {};
+    }
 
-    if (map.data) try {
-        for (var i = 0, p = 0; i < map.data.length; i++, p++)
-            if (map.data.substr(i, 1) != '.') {
-            var place = map.data.substr(i, this.letters);
-            for (var j = 1; j < this.sym.length; j++) if (this.sym[j] == place) break;
-            if (j == this.sym.length) continue;
-            this.select(this.getcellbynumber(p), j, 'user', true);
-            i += this.letters - 1;
-        }
-    } catch (e) {};
+    if (map.data) {
+        try {
+            for (var i = 0, p = 0; i < map.data.length; i++, p++) if (map.data.substr(i, 1) !== '.') {
+                var place = map.data.substr(i, this.letters);
+                for (var j = 1; j < this.sym.length; j++) if (this.sym[j] === place) {
+                    break;
+                }
+                if (j === this.sym.length) {
+                    continue;
+                }
+                this.select(this.getcellbynumber(p), j, 'user', true);
+                i += this.letters - 1;
+            }
+        } catch (e) {};
+    }
 
-    if (this.svg) this.render();
-    else if (this.rootnode.length) {
+    if (this.svg) {
+        this.render();
+    } else if (this.rootnode.length) {
         var t = this;
         this.rootnode.svg({onLoad: function (svg) { t.svg = svg; t.render(); }});
     }
 
     this.solvelogclear();
-    this.upd('state', 'solve');
+    this.upd('stats', 'update', 'solve');
 
     this.toggle('load');
 }
 
 sudoku.prototype.pos = function (x, y) {
-    if (y == void 0) { y = x.y; x = x.x; }
+    if (y === void 0) { y = x.y; x = x.x; }
     return {
         x: this.g.padding + this.g.cell_w * (x + 1),
         y: this.g.padding + this.g.cell_h * (y + 1)
@@ -502,7 +691,7 @@ sudoku.prototype.pos = function (x, y) {
 }
 
 sudoku.prototype.center = function (x, y) {
-    if (y == void 0) { y = x.y; x = x.x; }
+    if (y === void 0) { y = x.y; x = x.x; }
     return {
         x: this.g.padding + this.g.cell_w * (x + 1.5),
         y: this.g.padding + this.g.cell_h * (y + 1.5)
@@ -520,6 +709,7 @@ sudoku.prototype.render = function () {
     svg.configure({width: g.canv_w, height: g.canv_h}, true);
     svg.style("\
 #cells rect { fill: #fff; stroke: #000; stroke-width: 0.2; }\
+#cells.keyboard g.active rect { fill: #f5f5f5; }\
 #cells g.error-1 rect, #cells g.error-2 rect { fill: #f45252; }\
 #cells text { fill: #666; cursor: default; text-anchor: middle; }\
 #cells text.user { fill: #000; }\
@@ -552,11 +742,13 @@ sudoku.prototype.render = function () {
         "font-size": 0.33*g.cell_h + "px",
         cursor: "default",
         "text-anchor": "middle"});
-    for (var i = 0; i < this.mx; i++)
+    for (var i = 0; i < this.mx; i++) {
         svg.text(gr.coords, this.center(i, 0).x, g.padding + g.cell_h / 2 + 8, ""+(i+1));
-    for (var i = 0; i < this.my; i++)
+    }
+    for (var i = 0; i < this.my; i++) {
         svg.text(gr.coords, g.padding + g.cell_w / 2 + 5, this.center(0, i).y + 5, aa(i));
-    gr.cells = svg.group({id: "cells", "font-size": 0.7*g.cell_h + "px"});
+    }
+    gr.cells = svg.group({id: "cells", "font-size": 0.7*g.cell_h + "px", class_: (this.kbd_state ? "keyboard" : "")});
     for (var j = 0, cell; j < this.my; j++) for (var i = 0; i < this.mx; i++) if (cell = m[i][j]) {
         var p = this.pos(cell);
         cell.g = {};
@@ -569,6 +761,9 @@ sudoku.prototype.render = function () {
         }
         if (cell.status) {
             $(cell.g.node).addClass("error-" + cell.status);
+        }
+        if (cell === this.acell) {
+            $(cell.g.node).addClass("active");
         }
         for (var z = 0; z < cell.houses.length; z++) {
             if (cell.houses[z].type === 3) {
@@ -598,29 +793,38 @@ sudoku.prototype.render = function () {
         var p = {x: cell.g.x, y: cell.g.y},
             q = this.pos(i+1, j+1);
         if (this.boxes) {
-            for (var z1 = 0; z1 < cell.houses.length; z1++) if (cell.houses[z1].type == 2) break;
-            if (i != 0 && this.m[i - 1][j]) { // left
-                for (var z2 = 0; z2 < m[i - 1][j].houses.length; z2++)
-                    if (m[i - 1][j].houses[z2].type == 2) break;
-                if (cell.houses[z1].id != m[i - 1][j].houses[z2].id)
-                    svg.path(gr.hborder, "M"+p.x+","+p.y+"L"+p.x+","+q.y);
+            for (var z1 = 0; z1 < cell.houses.length; z1++) if (cell.houses[z1].type === 2) {
+                break;
             }
-            if (j != 0 && m[i][j - 1]) { // top
-                for (var z2 = 0; z2 < m[i][j - 1].houses.length; z2++)
-                    if (m[i][j - 1].houses[z2].type == 2) break;
-                if (cell.houses[z1].id != m[i][j - 1].houses[z2].id)
+            if (i !== 0 && this.m[i - 1][j]) { // left
+                for (var z2 = 0; z2 < m[i - 1][j].houses.length; z2++) if (m[i - 1][j].houses[z2].type === 2) {
+                    break;
+                }
+                if (cell.houses[z1].id !== m[i - 1][j].houses[z2].id) {
+                    svg.path(gr.hborder, "M"+p.x+","+p.y+"L"+p.x+","+q.y);
+                }
+            }
+            if (j !== 0 && m[i][j - 1]) { // top
+                for (var z2 = 0; z2 < m[i][j - 1].houses.length; z2++) if (m[i][j - 1].houses[z2].type === 2) {
+                    break;
+                }
+                if (cell.houses[z1].id !== m[i][j - 1].houses[z2].id) {
                     svg.path(gr.hborder, "M"+p.x+","+p.y+"L"+q.x+","+p.y);
+                }
             }
         }
-        if (j == 0 || !m[i][j - 1]) {
+        if (j === 0 || !m[i][j - 1]) {
             svg.path(gr.mborder, "M"+p.x+","+p.y+"L"+q.x+","+p.y);
         }
-        if (i == 0 || !m[i - 1][j])
+        if (i === 0 || !m[i - 1][j]) {
             svg.path(gr.mborder, "M"+p.x+","+p.y+"L"+p.x+","+q.y);
-        if (i == this.mx - 1 || !m[i + 1][j])
+        }
+        if (i === this.mx - 1 || !m[i + 1][j]) {
             svg.path(gr.mborder, "M"+q.x+","+p.y+"L"+q.x+","+q.y);
-        if (j == this.my - 1 || !m[i][j + 1])
+        }
+        if (j === this.my - 1 || !m[i][j + 1]) {
             svg.path(gr.mborder, "M"+p.x+","+q.y+"L"+q.x+","+q.y);
+        }
     }
 
     gr.grid_id = svg.group({id: "grid_id", "font-size": 0.8*this.s*g.cell_h + "px"});
@@ -628,7 +832,9 @@ sudoku.prototype.render = function () {
         var x = this.grids[z].pos.g.x + 0.5*this.s*g.cell_w,
             y = this.grids[z].pos.g.y + 0.7*this.s*g.cell_h,
             options = {};
-        if (this.grids[z] == this.agrid) options = {class_: 'active'};
+        if (this.grids[z] === this.agrid) {
+            options = {class_: 'active'};
+        }
         this.grids[z].id_node = svg.text(gr.grid_id, x, y, "" + (z + 1), options);
     }
     $("text", gr.grid_id).click(function () { t.select_grid(this.textContent - 1); });
@@ -654,30 +860,44 @@ sudoku.prototype.render = function () {
         svg.path(gr.selector, "M0,0L0," + g.sel_th + "L" + g.sel_tw + "," +
             g.sel_th + "L" + g.sel_tw + ",0L0,0",
             {fill: "none", stroke: "#888", "stroke-width": "1.5"});
-        $(gr.selector).bind('mouseover', function () {
-            if (t.timers.selector) {
-                clearTimeout(t.timers.selector);
-                t.timers.selector = false;
-            }
-        }).bind('mouseout', function () { t.selector_hide(); }).hide();
+        $(gr.selector)
+            .bind('mouseover', function () {
+                if (t.timers.selector) {
+                    clearTimeout(t.timers.selector);
+                    t.timers.selector = false;
+                }
+            }).bind('mouseout', function () {
+                t.selector_hide();
+            }).hide();
     }
 
     this.rendered = true;
 
-    if (window.console) console.log("rendered in: " + ((new Date()).getTime() - stime));
+    if (window.console) {
+        console.log("rendered in: " + ((new Date()).getTime() - stime));
+    }
 }
 
 sudoku.prototype.show_grid_id = function () { $(this.gr.grid_id).show(); }
 sudoku.prototype.hide_grid_id = function () { $(this.gr.grid_id).hide(); }
 
 sudoku.prototype.select_grid = function (grid) {
-    if (this.rendered && this.agrid) $(this.agrid.id_node).removeClass("active");
+    if (this.rendered && this.agrid) {
+        $(this.agrid.id_node).removeClass("active");
+    }
     this.agrid = false;
-    if (typeof grid == "number" || typeof grid == "string")
-        if (this.grids[+grid]) this.agrid = this.grids[+grid];
-    else if (typeof grid == "object" && grid.hasOwnProperty('id'))
-        if (this.grids[+grid.id]) this.agrid = this.grids[+grid.id];
-    if (this.rendered) $(this.agrid.id_node).addClass("active");
+    if (typeof grid === "number" || typeof grid === "string") {
+        if (this.grids[+grid]) {
+            this.agrid = this.grids[+grid];
+        }
+    } else if (typeof grid === "object" && grid.hasOwnProperty('id')) {
+        if (this.grids[+grid.id]) {
+            this.agrid = this.grids[+grid.id];
+        }
+    }
+    if (this.rendered) {
+        $(this.agrid.id_node).addClass("active");
+    }
     this.toggle('select_grid');
     return this;
 }
@@ -781,8 +1001,7 @@ sudoku.prototype.addhouse = function (type, grid, q) {
     for (i = 0; i < this.s; i++) {
         house[i].houses.push(house);
         if (house.type > 4) {
-            for (j = 0, c = 0; j < house[i].houses.length; j++)
-                if (house[i].houses[j].type === house.type) {
+            for (j = 0, c = 0; j < house[i].houses.length; j++) if (house[i].houses[j].type === house.type) {
                 c++;
             }
             if (c === 1) {
@@ -798,7 +1017,7 @@ sudoku.prototype.addhouse = function (type, grid, q) {
     }
     this.houses[house.s] = house;
     this.resolve();
-    this.upd('state');
+    this.upd('update', 'stats');
     return s;
 }
 
@@ -841,8 +1060,10 @@ sudoku.prototype.delhouse = function (type, grid, q) {
     }
     m: for (i = 0; i < this.s; i++) {
         array_del_value(house[i].houses, house);
-        if (house[i].digit) for (j = 0; j < this.s; j++) {
-            house[j].cand[house[i].digit]--;
+        if (house[i].digit) {
+            for (j = 0; j < this.s; j++) {
+                house[j].cand[house[i].digit]--;
+            }
         }
         if (this.rendered) {
             for (j = 0; j < house[i].houses.length; j++) if (house[i].houses[j].type === house.type) {
@@ -858,7 +1079,7 @@ sudoku.prototype.delhouse = function (type, grid, q) {
         }
     }
     delete this.houses[house.s];
-    this.upd('state');
+    this.upd('stats', 'update');
     this.resolve();
     return true;
 }
@@ -884,8 +1105,9 @@ function coordx(cell) { return aa(cell.x); }
 function coordy(cell) { return "" + (1 + cell.y); }
 
 sudoku.prototype.getcellbynumber = function (number) {
-    for (var y = 0; y < this.my; y++) for (var x = 0; x < this.mx; x++)
-        if (this.m[x][y]) if (!number--) return this.m[x][y];
+    for (var y = 0; y < this.my; y++) for (var x = 0; x < this.mx; x++) if (this.m[x][y] && !number--) {
+        return this.m[x][y];
+    }
 }
 
 sudoku.prototype.selector_hide = function (now) {
@@ -897,7 +1119,9 @@ sudoku.prototype.selector_hide = function (now) {
         $(this.gr.selector).hide();
         return;
     }
-    if (this.timers.selector) return;
+    if (this.timers.selector) {
+        return;
+    }
     var t = this;
     this.timers.selector = setTimeout(function () {
         $(t.gr.selector).hide();
@@ -922,27 +1146,32 @@ sudoku.prototype.solvelog = function (type, o1, o2, o3, o4) {
             for (var i = 1; i < line.cells.length; i++)
                 clist += "; " + coord(line.cells[i]) + " — " + this.sym[line.cells[i].digit];
             this.nodes.log.append("<p>Naked singles in the cells " + clist + "</p>");
-        }
-        else
+        } else {
             this.nodes.log.append("<p>Naked single in the cell " +
                 coord(line.cells[0]) + " — set to " + this.sym[line.cells[0].digit] + "</p>");
+        }
         break;
       case 'hidden_single':
         line.cell = o1;
         line.house = o2;
-        this.nodes.log.append("<p>Hidden single in the " + line.house.id + "-" + (["column", "row", "box", "diagonal", "antidiagonal"])[line.house.type] + " — set " + coord(line.cell) + " to " + this.sym[line.cell.digit] + "</p>");
+        this.nodes.log.append("<p>Hidden single in the " + line.house.id + "-" +
+            (["column", "row", "box", "diagonal", "antidiagonal"])[line.house.type] + " — set " +
+            coord(line.cell) + " to " + this.sym[line.cell.digit] + "</p>");
         break;
       case 'naked_subset':
         line.cells = o1;
         line.digits = o2;
         line.done = o3;
         var clist = coord(line.cells[0]);
-        for (var i = 1; i < line.cells.length; i++)
+        for (var i = 1; i < line.cells.length; i++) {
             clist += ", " + coord(line.cells[i]);
+        }
         var dlist = this.sym[line.digits[0]];
-        for (var i = 1; i < line.digits.length; i++)
+        for (var i = 1; i < line.digits.length; i++) {
             dlist += ", " + this.sym[line.digits[i]];
-        this.nodes.log.append("<p>Naked " + (['', '', "pair", "triple", "quad"])[line.cells.length] + ": " + clist + " — removing " + dlist + " from common houses</p>");
+        }
+        this.nodes.log.append("<p>Naked " + (['', '', "pair", "triple", "quad"])[line.cells.length] + ": " +
+            clist + " — removing " + dlist + " from common houses</p>");
         break;
       default:
         this.nodes.log.append("<p>" + line.type + "</p>");
@@ -954,25 +1183,35 @@ sudoku.prototype.solvelog = function (type, o1, o2, o3, o4) {
 function naked_subset_match(cells) {
     var have = [], i, j, k;
     for (i = 0; i < cells.length; i++) for (j = 0; j < cells[i].rcand.length; j++) {
-        for (k = 0; k < have.length; k++) if (have[k] == cells[i].rcand[j]) break;
-        if (k == have.length) have.push(cells[i].rcand[j]);
+        for (k = 0; k < have.length; k++) if (have[k] === cells[i].rcand[j]) {
+            break;
+        }
+        if (k === have.length) {
+            have.push(cells[i].rcand[j]);
+        }
     }
-    return cells.length == have.length ? have : false;
+    return cells.length === have.length ? have : false;
 }
 
 function common_houses(cells) {
     var t = {}, h = [], i, j;
     for (i = 0; i < cells.length; i++) for (j = 0; j < cells[i].houses.length; j++) {
-        if (t[cells[i].houses[j].s]) t[cells[i].houses[j].s][0]++;
-        else t[cells[i].houses[j].s] = [1, cells[i].houses[j]];
+        if (t[cells[i].houses[j].s]) {
+            t[cells[i].houses[j].s][0]++;
+        } else {
+            t[cells[i].houses[j].s] = [1, cells[i].houses[j]];
+        }
     }
-    for (i in t) if (t[i][0] == cells.length) h.push(t[i][1]);
+    for (i in t) if (t[i][0] === cells.length) {
+        h.push(t[i][1]);
+    }
     return h;
 }
 
 function in_array(arr, value) {
-    for (var i = 0; i < arr.length; i++)
-        if (arr[i] == value) return true;
+    for (var i = 0; i < arr.length; i++) if (arr[i] === value) {
+        return true;
+    }
     return false;
 }
 
@@ -980,7 +1219,9 @@ sudoku.prototype.solve_naked_subset = function () {
     var p, i, j, k, max = Math.floor(this.s / 2), cmax, empty, ret = 0;
     for (p in this.houses)
     if ((cmax = this.s - this.houses[p].filled - this.houses[p].ns - 2) > 0) {
-        if (max < cmax) cmax = max;
+        if (max < cmax) {
+            cmax = max;
+        }
         for (k = 2; k <= cmax; k++) {
             for (j = 0, empty = []; j < this.s; j++)
             if (this.houses[p][j] && !this.houses[p][j].digit &&
@@ -1068,7 +1309,7 @@ sudoku.prototype.solve1 = function () {
     nstatus = errors ? 1 : (stumps ? 2 : 0);
     if (this.state != nstatus) {
         this.state = nstatus;
-        this.upd();
+        this.upd('stats');
     }
 
     return toset;
@@ -1107,7 +1348,10 @@ sudoku.prototype.upd = function () {
         if (update_w.solve) {
             t.solve();
         }
-        if (update_w.state) {
+        if (update_w.stats) {
+            t.toggle('stats');
+        }
+        if (update_w.update) {
             t.toggle('update');
         }
     }, 1);
@@ -1159,7 +1403,7 @@ sudoku.prototype.select_user = function (cell) {
         }
         cell.source = 'user';
         this.ufilled++;
-        this.upd('state');
+        this.upd('stats', 'update');
     }
     return this;
 }
@@ -1207,7 +1451,11 @@ sudoku.prototype.select = function (cell, k, source, force) {
             this.sym[cell.digit],
             {class_: source});
     }
-    this.upd('state', source !== 'solver' ? 'solve' : void 0);
+    if (this.interactive && cell === this.acell) {
+        this.select_next();
+    }
+
+    this.upd('stats', source === 'user' ? 'update' : void 0, source !== 'solver' ? 'solve' : void 0);
 
     return true;
 }
@@ -1217,8 +1465,7 @@ sudoku.prototype.clear = function () {
         return false;
     }
     this.resolve();
-    for (var i = 0; i < this.mx; i++) for (var j = 0; j < this.my; j++) if (this.m[i][j])
-        if (this.m[i][j].digit) {
+    for (var i = 0; i < this.mx; i++) for (var j = 0; j < this.my; j++) if (this.m[i][j] && this.m[i][j].digit) {
         this.cancel(this.m[i][j], this.m[i][j].source);
     }
 }
@@ -1273,7 +1520,7 @@ sudoku.prototype.cancel = function (cell, source) {
     if (this.rendered) {
         this.svg.remove($("text", cell.g.node));
     }
-    this.upd('state');
+    this.upd('stats', source === 'user' ? 'update' : void 0);
     this.resolve();
 
     return true;
