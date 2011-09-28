@@ -5,12 +5,13 @@
     <title>Sudoku Solver</title>
     <meta name="keywords" content="sudoku,solver,online,logic,interactive,diagonal">
     <meta name="robots" content="index,follow">
-    <meta name="description" content="Online sudoku solver by logic. Supports different variations of the sudoku.">
+    <meta name="description" content="Online sudoku solver by logic. Supports different variations of sudoku.">
     <link rel="shortcut icon" type="image/x-icon" href="./favicon.ico">
     <style type="text/css">
 
 body {
-    font-family: Georgia, Arial;
+    font-family: 'Lucida Grande', Arial, Verdana, sans-serif;
+    font-size: 10pt;
     overflow-y: scroll;
     overflow-x: auto;
     margin: 0;
@@ -81,7 +82,7 @@ var lang = 'en';
 
 Modernizr.load({
     test: Modernizr.svg,
-    yep: ["./sudoku.css", "./jquery-1.5.js", "./jquery-svg.js", "./jquery-svgdom.js",
+    yep: ["./sudoku.css", "./eventemitter.js", "./jquery-1.5.js", "./jquery-svg.js", "./jquery-svgdom.js",
         "js!./sudoku.js?", "js!./manager.js?"]
 });
 
@@ -175,6 +176,7 @@ Modernizr.load({
             <div id="selectgrid"></div>
             <label><input type="checkbox" id="diag_1"> main diagonal</label><br />
             <label><input type="checkbox" id="diag_2"> anti diagonal</label><br />
+            <label><input type="checkbox" id="windoku"> windoku</label><br />
             </form>
         </div>
         <div id="sudokutype"></div>
@@ -186,7 +188,7 @@ Modernizr.load({
 <div id="helpnode">
 <div id="helptext">
 sudoku solver v&nbsp;0.9<br />
-© 2010 <a href="http://kivalin.ru/" target="_blank">Roman Kivalin</a>
+© 2010 <a href="https://kivalin.me/" target="_blank">Roman Kivalin</a>
 <p>v 0.9: UI changes, show error message for no-svg-browser or no-js-browser users, network optimizations.</p>
 <p>
 TODO:

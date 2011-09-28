@@ -2,10 +2,6 @@
 
 a img { border: none; } /* for firefox */
 
-body {
-    font-size: 9pt;
-}
-
 .ui-widget {
     font: inherit;
 }
@@ -42,16 +38,6 @@ nav.panel {
     padding: 0;
     margin: 0;
     background-color: #5e5e5e;
-    background-image: -webkit-gradient(
-        linear,
-        left top,
-        left bottom,
-        from(rgba(0, 0, 0, 0.2)),
-        color-stop(0.2, rgba(0, 0, 0, 0)),
-        color-stop(0.8, rgba(0, 0, 0, 0)),
-        to(rgba(0, 0, 0, 0.2))
-    );
-    background-image: -moz-linear-gradient(left top, left bottom, from(#797979), color-stop(0.2, #5e5e5e), color-stop(0.2, #5e5e5e), to(#797979));
     -ms-box-shadow: 0 0 3px #4e4e4e;
     -moz-box-shadow: 0 0 3px #4e4e4e;
     -webkit-box-shadow: 0 0 3px #4e4e4e;
@@ -98,7 +84,7 @@ nav#panel {
     border-right: 1px solid #4e4e4e;
 }
 .panel .elem .label {
-    padding: 3px 10px;
+    padding: 4px 10px;
     text-shadow: 0 1px 0 #000;
     text-align: center;
     cursor: pointer;
@@ -241,6 +227,7 @@ nav#panel {
 }
 
 div#sudoku {
+    font-family: Georgia;
     text-align: center;
     min-width: 100%;
     min-height: 100%;

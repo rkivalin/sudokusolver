@@ -1,18 +1,21 @@
 
 function array(dim, value, level) {
     var i, arr = [];
-    level = (level === void 0) ? 0 : ~~level;
-    if (typeof (dim) === 'number') {
-        for (i = 0; i < dim; i++) {
-            arr[i] = value;
-        }
-    } else if (dim.length === 1+level) {
-        for (i = 0; i < dim[level]; i++) {
-            arr[i] = value;
+    if (level === void 0) {
+        level = 0;
+    }
+    if (typeof dim !== 'object' && !(dim instanceof Array)) {
+        dim = [dim];
+    }
+    if (dim.length === 1+level) {
+        if (value !== void 0) {
+            for (i = 0; i < dim[level]; i += 1) {
+                arr[i] = value;
+            }
         }
     } else {
-        for (i = 0; i < dim[level]; i++) {
-            arr[i] = array(dim, value, level + 1);
+        for (i = 0; i < dim[level]; i += 1) {
+            arr[i] = array(dim, value, 1 + level);
         }
     }
     return arr;
@@ -22,7 +25,7 @@ function array_del(arr, index) {
     if (+index >= arr.length) {
         return;
     }
-    for (var i = +index + 1; i < arr.length; i++) {
+    for (var i = 1 + index; i < arr.length; i += 1) {
         arr[i - 1] = arr[i];
     }
     arr.pop();
@@ -79,29 +82,37 @@ function is_integer() {
     return true;
 }
 
-function sudoku(rootnode, cfg) {
-    if (rootnode === void 0) {
-        rootnode = $();
+function SudokuSolver(opts) {
+    if (!(this instanceof SudokuSolver)) {
+        return new SudokuSolver(opts);
     }
-    if (cfg === void 0) {
-        cfg = {};
+    var self = this;
+    if (opts === void 0) {
+        opts = {};
+    }
+    var defs = {node: $(), interactive: true, autovalidate: true, autosolve: true,
+        gncSpeed: 100, keyboard: true, mouse: true};
+    for (var i in opts) {
+        defs[i] = opts[i];
     }
 
-    this.rootnode = rootnode;
-    this.timers = {selector: false, update: false, recsolver: false};
+    self.rootNode = defs.node;
+    self.timers = {selector: false, update: false, recsolver: false};
 
-    this.sources = {user: true, solver: true, gnc: true};
+    self.sources = {user: true, solver: true, gnc: true};
 
-    this.state = -1;
-    this.svg = false;
-    this.rendered = false;
-    this.gr = [];
-    this.interactive = true; // gui allows to interact
-    this.autovalidate = true; // automatic validation
-    this.autosolve = true; // automatic solving
-    this.g = {
+    self.state = -1;
+    self.svg = false;
+    self.rendered = false;
+    self.touched = []; // cells that are changed but not processed yet
+    self.gr = [];
+    self.interactive = defs.interactive; // gui allows to interact
+    self.autovalidate = 'solve'; // automatic validation
+    self.autovalidate = defs.autovalidate; // automatic validation
+    self.autosolve = defs.autosolve; // automatic solving
+    self.g = {
         /// manual
-        cell_h: 30, cell_w: 30, // cell size
+        cell_h: 50, cell_w: 50, // cell size
         sel_h: 20, sel_w: 20, // selector cell size
         padding: 5.5, // padding inside canvas
         /// automatic
@@ -110,45 +121,43 @@ function sudoku(rootnode, cfg) {
         sel_th: 0, sel_tw: 0 // selector size
     };
 
-    this.loglines = [];
-    this.m = []; // game map
+    self.m = []; // game map
 
-    this.h = 0; // box height
-    this.w = 0; // box width
-    this.s = 0; // sudoku size — this.h * this.w
-    this.total = 0; // total number of cells
-    this.filled = 0; // number of filled cells
-    this.ufilled = 0; // number of filled by user cells
-    this.boxes = false; // is boxes are used (there are no boxes if this.h or this.w is 1)
-    this.mx = 0; // main grid height
-    this.my = 0; // main grid width
-    this.houses = {}; // list of houses
-    this.sym = []; // sudoku symbols
-    this.symtxt = false;
-    this.grids = []; // coordinates of grids
-    this.letters = 1; // maximum number of letters used in sudoku symbols
+    self.h = 0; // box height
+    self.w = 0; // box width
+    self.s = 0; // sudoku size — this.h * this.w
+    self.errors = 0; // error count
+    self.total = 0; // total number of cells
+    self.filled = 0; // number of filled cells
+    self.ufilled = 0; // number of filled by user cells
+    self.boxes = false; // is boxes are used (there are no boxes if this.h or this.w is 1)
+    self.mx = 0; // main grid height
+    self.my = 0; // main grid width
+    self.houses = {}; // list of houses
+    self.symb = []; // sudoku symbols
+    self.symbtxt = false;
+    self.symbSize = 1; // maximum number of letters used in sudoku symbols
+    self.grids = []; // coordinates of grids
+
+    self.solver = {nakedSingles: []};
 
     this.update_w = {};
-    this.on_stats = []; // this.filled, errors
-    this.on_update = []; // this.ufilled, this.houses, this.sym,
-    this.on_load = []; // this.load_map()
-    this.on_select_grid = [];
-    this.on_select_cell = [];
-    this.on_gnc_state = [];
     this.aftersolve = [];
-    this.gnc = false;
-    this.gnc_speed = 100;
+    self.gnc = false;
+    self.gncSpeed = defs.gncSpeed;
 
-    this.kbd_state = false;
+    self.kbdState = false;
     this.kbd_ev = false;
 
-    if (this.interactive && cfg.keyboard !== false) {
-        this.keyboard(true);
+    if (self.interactive && defs.keyboard !== false) {
+        self.keyboard(true);
     }
 
 }
 
-sudoku.prototype.select_next = function () {
+SudokuSolver.prototype = new EventEmitter;
+
+SudokuSolver.prototype.select_next = function () {
     var x = this.mx + (this.acell ? this.acell.x : -1), y = this.my + (this.acell ? this.acell.y : -1), limit = this.mx * this.my;
     do {
         x += 1;
@@ -164,19 +173,19 @@ sudoku.prototype.select_next = function () {
     }
 };
 
-sudoku.prototype.keyboard = function (state) {
+SudokuSolver.prototype.keyboard = function (state) {
     if (arguments.length === 0) {
-        return this.kbd_state;
+        return this.kbdState;
     }
-    if (state === false && this.kbd_state) {
+    if (state === false && this.kbdState) {
         // turn it off
         $(document).unbind("." + this.kbd_ev);
-        this.kbd_state = false;
+        this.kbdState = false;
         if (this.rendered) {
             $(this.gr.cells).removeClass("keyboard");
         }
     }
-    if (state === true && !this.kbd_state) {
+    if (state === true && !this.kbdState) {
         // turn it on
         if (!this.interactive) {
             /* TODO: error handling */
@@ -196,7 +205,7 @@ sudoku.prototype.keyboard = function (state) {
                     y += v;
                 }
             } while (!t.m[x % t.mx][y % t.my]);
-            t.select_cell(t.m[x % t.mx][y % t.my]);
+            t.select_cell(t.m[x % t.mx][y % t.my], false);
         };
         var move = function (coord, v) {
             if (!t.acell) {
@@ -208,7 +217,7 @@ sudoku.prototype.keyboard = function (state) {
             while (!t.m[c.x % t.mx][c.y % t.my]) {
                 c[coord] += v;
             }
-            t.select_cell(t.m[c.x % t.mx][c.y % t.my]);
+            t.select_cell(t.m[c.x % t.mx][c.y % t.my], false);
         };
         $(document).bind("keydown." + this.kbd_ev, function (e) {
             if (typeof e.target.form === "object" ||  // if target is form element
@@ -243,7 +252,7 @@ sudoku.prototype.keyboard = function (state) {
             }
             return false;
         });
-        this.kbd_state = true;
+        this.kbdState = true;
         if (this.rendered) {
             $(this.gr.cells).addClass("keyboard");
         }
@@ -251,45 +260,11 @@ sudoku.prototype.keyboard = function (state) {
     return this;
 }
 
-
-sudoku.prototype.bind = function (type, f) {
-    if (!this.hasOwnProperty('on_' + type)) {
-        /* TODO: error handling */
-        return this;
-    }
-    if (this.hasOwnProperty('on_' + type)) {
-        this['on_' + type].push(f);
-    }
-    return this;
-}
-sudoku.prototype.unbind = function (type, f) {
-    if (!this.hasOwnProperty('on_' + type)) {
-        /* TODO: error handling */
-        return this;
-    }
-    if (f === void 0) {
-        this['on' + type] = [];
-    } else {
-        array_del_value(this['on' + type], f);
-    }
-    return this;
-}
-sudoku.prototype.toggle = function (type) {
-    if (!this.hasOwnProperty('on_' + type)) {
-        /* TODO: error handling */
-        return this;
-    }
-    for (var i = 0; i < this['on_' + type].length; i++) {
-        this['on_' + type][i].call(this);
-    }
-    return this;
-}
-
-sudoku.prototype.export_solution = function () {
+SudokuSolver.prototype.export_solution = function () {
     var e = "", x, y, cell, num = 0;
     for (y = 0; y < this.my; y++) for (x = 0; x < this.mx; x++) if (cell = this.m[x][y]) {
         if (cell.digit) {
-            e += str_repeat('.', num) + str_pad(this.sym[cell.digit], this.letters, "_", 'STR_PAD_LEFT');
+            e += str_repeat('.', num) + str_pad(this.symb[cell.digit], this.letters, "_", 'STR_PAD_LEFT');
             num = 0;
         } else {
             num++;
@@ -298,7 +273,7 @@ sudoku.prototype.export_solution = function () {
     return e;
 }
 
-sudoku.prototype.export_all = function () {
+SudokuSolver.prototype.export_all = function () {
     var e = {map: "", data: "", solution: ""}, c = false;
     if (this.h !== 3 || this.w !== 3) {
         e.map += this.h + "x" + this.w + ",";
@@ -314,19 +289,19 @@ sudoku.prototype.export_all = function () {
         case 3: e.map += "h=3;" + this.houses[p].grid + ","; break;
         case 4: e.map += "h=4;" + this.houses[p].grid + ","; break;
     }
-    if (this.symtxt !== false) {
-        e.map += "sym=" + this.symtxt + ",";
+    if (this.symbtxt !== false) {
+        e.map += "symb=" + this.symbtxt + ",";
     }
 
     for (var y = 0, cell, num1 = 0, num2 = 0; y < this.my; y++) for (var x = 0; x < this.mx; x++) if (cell = this.m[x][y]) {
         if (cell.digit && cell.source === 'user') {
-            e.data += str_repeat('.', num1) + str_pad(this.sym[cell.digit], this.letters, "_", 'STR_PAD_LEFT');
+            e.data += str_repeat('.', num1) + str_pad(this.symb[cell.digit], this.letters, "_", 'STR_PAD_LEFT');
             num1 = 0;
         } else {
             num1++;
         }
         if (cell.digit) {
-            e.solution += str_repeat('.', num2) + str_pad(this.sym[cell.digit], this.letters, "_", 'STR_PAD_LEFT');
+            e.solution += str_repeat('.', num2) + str_pad(this.symb[cell.digit], this.letters, "_", 'STR_PAD_LEFT');
             num2 = 0;
         } else {
             num2++;
@@ -335,7 +310,7 @@ sudoku.prototype.export_all = function () {
     return e;
 }
 
-sudoku.prototype.import_txt = function (data) {
+SudokuSolver.prototype.import_txt = function (data) {
     if (typeof data !== "string") {
         return false;
     }
@@ -371,8 +346,8 @@ sudoku.prototype.import_txt = function (data) {
         vars[t[0]] = t[1];
         i++;
     }
-    if ("sym" in vars) {
-        map.sym = vars.sym;
+    if ("symb" in vars) {
+        map.symb = vars.symb;
     }
     if (i === data.length - 1 && data[i].match(/^[\._0-9A-Z]*$/)) {
         map.data = data[i];
@@ -380,7 +355,7 @@ sudoku.prototype.import_txt = function (data) {
     return this.load_map(map);
 }
 
-sudoku.prototype.show_selector = function () {
+SudokuSolver.prototype.show_selector = function () {
     if (!(this.interactive && this.rendered)) {
         return this;
     }
@@ -415,7 +390,7 @@ sudoku.prototype.show_selector = function () {
     return this;
 }
 
-sudoku.prototype.is_cell = function (cell) {
+SudokuSolver.prototype.isCell = function (cell) {
     try {
         return this.m[cell.x][cell.y] === cell;
     } catch (e) {
@@ -423,12 +398,12 @@ sudoku.prototype.is_cell = function (cell) {
     }
 }
 
-sudoku.prototype.select_cell = function (cell) {
+SudokuSolver.prototype.select_cell = function (cell, showSelector) {
     if (!this.interactive) {
         /* error handling */
         return this;
     }
-    if (!this.is_cell(cell) && cell !== false) {
+    if (!this.isCell(cell) && cell !== false) {
         /* error handling */
         return this;
     }
@@ -440,7 +415,7 @@ sudoku.prototype.select_cell = function (cell) {
         }
         if (this.acell !== false) {
             $(this.acell.g.node).addClass("active");
-            if (!this.acell.digit) {
+            if (!this.acell.digit && showSelector !== false) {
                 this.show_selector();
             } else {
                 this.selector_hide(true);
@@ -448,12 +423,13 @@ sudoku.prototype.select_cell = function (cell) {
         } else {
             this.selector_hide(true);
         }
+        //this.acell.g.node.scrollIntoViewIfNeeded();
     }
-    this.toggle('select_cell');
+    this.emit('select_cell');
     return this;
 }
 
-sudoku.prototype.cell_click = function (el, e, cell) {
+SudokuSolver.prototype.cell_click = function (el, e, cell) {
     if (e.ctrlKey || e.altKey || e.shiftKey || e.metaKey) {
         return;
     }
@@ -466,23 +442,23 @@ sudoku.prototype.cell_click = function (el, e, cell) {
     }
 }
 
-sudoku.prototype.cell_click_f = function (ii, jj) {
+SudokuSolver.prototype.cell_click_f = function (ii, jj) {
     var i = ii, j = jj, t = this;
     return function (e) { t.cell_click(this, e, t.m[i][j]); };
 }
 
-sudoku.prototype.selector_click = function (el, e, k) {
+SudokuSolver.prototype.selector_click = function (el, e, k) {
     if (!e.shiftKey && (this.acell.cand[k] || this.acell.mask[k])) return;
     this.selector_hide(true);
     this.select(this.acell, k, 'user', e.shiftKey);
 }
 
-sudoku.prototype.selector_click_f = function (kk) {
+SudokuSolver.prototype.selector_click_f = function (kk) {
     var k = kk, t = this;
     return function (e) { t.selector_click(this, e, k); }
 }
 
-sudoku.prototype.unload = function () {
+SudokuSolver.prototype.unload = function () {
     if (this.gnc) {
         this.gnc_stop();
     }
@@ -492,7 +468,7 @@ sudoku.prototype.unload = function () {
         this.timers[i] = false;
     }
     this.solving = false;
-    this.rootnode.svg('destroy');
+    this.rootNode.svg('destroy');
     this.svg = false;
     this.rendered = false;
     this.state = -1;
@@ -501,38 +477,38 @@ sudoku.prototype.unload = function () {
     this.houses = {};
 }
 
-sudoku.prototype.load_sym = function (s) {
-    this.symtxt = false;
+SudokuSolver.prototype.load_sym = function (s) {
+    this.symbtxt = false;
     if (typeof s === "string" && s.length && s.length % this.s === 0) {
-        this.symtxt = s;
+        this.symbtxt = s;
         var n = s.length / this.s;
-        this.sym = [''];
+        this.symb = [''];
         for (var i = 0; i < this.s; i++) {
-            this.sym.push(s.substr(i * n, n));
+            this.symb.push(s.substr(i * n, n));
         }
     } else if (this.s < 16) {
-        this.sym = ['', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
+        this.symb = ['', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
     } else {
-        this.sym = ['', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+        this.symb = ['', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
         for (var i = 0; i < this.s - 10; i++) {
-            this.sym.push(aa(i));
+            this.symb.push(aa(i));
         }
     }
-    this.letters = this.sym[this.sym.length - 1].length;
+    this.symbSize = this.symb[this.symb.length - 1].length;
     if (this.rendered) {
         for (var j = 0, cell; j < this.my; j++) for (var i = 0; i < this.mx; i++) if ((cell = this.m[i][j]) && cell.digit) {
-            $("text", cell.g.node).text(this.sym[cell.digit]);
+            $("text", cell.g.node).text(this.symb[cell.digit]);
         }
         if (this.interactive) {
             for (var i = 0; i < this.s; i++) {
-                $("text", this.gr.selector.childNodes[i]).text(this.sym[1 + i]);
+                $("text", this.gr.selector.childNodes[i]).text(this.symb[1 + i]);
             }
         }
     }
     this.upd('update');
 }
 
-sudoku.prototype.load_map = function (map) {
+SudokuSolver.prototype.load_map = function (map) {
     if (this.gnc) {
         this.gnc_stop();
     }
@@ -559,7 +535,7 @@ sudoku.prototype.load_map = function (map) {
     }
     this.boxes = this.w !== 1;
     this.s = this.w * this.h;
-    this.load_sym(map.sym);
+    this.load_sym(map.symb);
     this.mx = 0;
     this.my = 0;
     var vgrids = [];
@@ -587,6 +563,7 @@ sudoku.prototype.load_map = function (map) {
         this.mx = this.my = this.s;
     }
     this.m = array([this.mx, this.my]);
+    this.errors = 0;
     this.filled = 0;
     this.ufilled = 0;
     this.total = 0;
@@ -606,13 +583,13 @@ sudoku.prototype.load_map = function (map) {
                 source: '',
                 houses: [], // list of houses;
                 cand: array([1 + this.s], 0), // candidates (0 - is candidate);
-                rcand: [], // digits that can be set into this cell (updates with .solve())
+                rcand: [], // digits that can be set into this cell (updates with .validate())
                 mask: array([1 + this.s], 0), // mask (non zero - masked);
                 solver: {ns: {}}, // ns - naked subset - is cell is a part of a naked subset;
-                status: 0, // cell status;
+                touched: false,
+                error: false, // error bit;
                 x: i, y: j,
-                grids: [grid],
-                svg: false
+                grids: [grid]
             };
             this.total++;
         }
@@ -656,33 +633,33 @@ sudoku.prototype.load_map = function (map) {
     if (map.data) {
         try {
             for (var i = 0, p = 0; i < map.data.length; i++, p++) if (map.data.substr(i, 1) !== '.') {
-                var place = map.data.substr(i, this.letters);
-                for (var j = 1; j < this.sym.length; j++) if (this.sym[j] === place) {
+                var place = map.data.substr(i, this.symbSize);
+                for (var j = 1; j < this.symb.length; j++) if (this.symb[j] === place) {
                     break;
                 }
-                if (j === this.sym.length) {
+                if (j === this.symb.length) {
                     continue;
                 }
                 this.select(this.getcellbynumber(p), j, 'user', true);
-                i += this.letters - 1;
+                i += this.symbSize - 1;
             }
         } catch (e) {};
     }
 
     if (this.svg) {
         this.render();
-    } else if (this.rootnode.length) {
+    } else if (this.rootNode.length) {
         var t = this;
-        this.rootnode.svg({onLoad: function (svg) { t.svg = svg; t.render(); }});
+        this.rootNode.svg({onLoad: function (svg) { t.svg = svg; t.render(); }});
     }
 
     this.solvelogclear();
     this.upd('stats', 'update', 'solve');
 
-    this.toggle('load');
+    this.emit('load');
 }
 
-sudoku.prototype.pos = function (x, y) {
+SudokuSolver.prototype.pos = function (x, y) {
     if (y === void 0) { y = x.y; x = x.x; }
     return {
         x: this.g.padding + this.g.cell_w * (x + 1),
@@ -690,7 +667,7 @@ sudoku.prototype.pos = function (x, y) {
     };
 }
 
-sudoku.prototype.center = function (x, y) {
+SudokuSolver.prototype.center = function (x, y) {
     if (y === void 0) { y = x.y; x = x.x; }
     return {
         x: this.g.padding + this.g.cell_w * (x + 1.5),
@@ -698,7 +675,20 @@ sudoku.prototype.center = function (x, y) {
     };
 }
 
-sudoku.prototype.render = function () {
+SudokuSolver.prototype.renderDiff = function () {
+    var self = this;
+
+    while (self.obsolete.length) {
+        var cell = self.obsolete.pop();
+        if (cell.g.digit !== cell.digit) {
+
+        }
+    }
+
+    return self;
+}
+
+SudokuSolver.prototype.render = function () {
     var stime = (new Date()).getTime();
     var t = this, svg = this.svg, g = this.g, m = this.m;
     g.canv_w = (this.mx+1)*g.cell_w + 2*g.padding;
@@ -709,12 +699,14 @@ sudoku.prototype.render = function () {
     svg.configure({width: g.canv_w, height: g.canv_h}, true);
     svg.style("\
 #cells rect { fill: #fff; stroke: #000; stroke-width: 0.2; }\
-#cells.keyboard g.active rect { fill: #f5f5f5; }\
-#cells g.error-1 rect, #cells g.error-2 rect { fill: #f45252; }\
+#cells.keyboard g.active rect { fill: #ccc; }\
+#cells g.error rect { fill: #f45252; }\
+#cells g.error.active rect { fill: #f42222; }\
 #cells text { fill: #666; cursor: default; text-anchor: middle; }\
 #cells text.user { fill: #000; }\
 #cells text.solver { fill: #e00; }\
 #cells text.gnc { fill: #080; }\
+#cells text.cand { fill: #222; cursor: default; text-anchor: start; font-family: serif; font-size: 8px; }\
 \
 #selector { opacity: 0.7; }\
 #selector:hover { opacity: 0.9; }\
@@ -748,19 +740,20 @@ sudoku.prototype.render = function () {
     for (var i = 0; i < this.my; i++) {
         svg.text(gr.coords, g.padding + g.cell_w / 2 + 5, this.center(0, i).y + 5, aa(i));
     }
-    gr.cells = svg.group({id: "cells", "font-size": 0.7*g.cell_h + "px", class_: (this.kbd_state ? "keyboard" : "")});
+    gr.cells = svg.group({id: "cells", "font-size": 0.7*g.cell_h + "px", class_: (this.kbdState ? "keyboard" : "")});
     for (var j = 0, cell; j < this.my; j++) for (var i = 0; i < this.mx; i++) if (cell = m[i][j]) {
         var p = this.pos(cell);
         cell.g = {};
         cell.g.node = svg.group(gr.cells);
         cell.g.x = p.x;
         cell.g.y = p.y;
+        cell.g.cand = false;
         svg.rect(cell.g.node, p.x, p.y, g.cell_w, g.cell_h);
         if (this.interactive) {
             $(cell.g.node).bind('click', this.cell_click_f(i, j));
         }
-        if (cell.status) {
-            $(cell.g.node).addClass("error-" + cell.status);
+        if (cell.error) {
+            $(cell.g.node).addClass("error");
         }
         if (cell === this.acell) {
             $(cell.g.node).addClass("active");
@@ -776,7 +769,7 @@ sudoku.prototype.render = function () {
             svg.text(cell.g.node,
                 cell.g.x + g.tx,
                 cell.g.y + g.ty,
-                this.sym[cell.digit],
+                this.symb[cell.digit],
                 {class_: cell.source});
         }
     }
@@ -854,7 +847,7 @@ sudoku.prototype.render = function () {
             if (k > this.s) {
                 continue;
             }
-            svg.text(n, g.sel_w * (i + 0.5), g.sel_h * (j + 0.7), this.sym[k]);
+            svg.text(n, g.sel_w * (i + 0.5), g.sel_h * (j + 0.7), this.symb[k]);
             $(n).bind('click', this.selector_click_f(k));
         }
         svg.path(gr.selector, "M0,0L0," + g.sel_th + "L" + g.sel_tw + "," +
@@ -876,12 +869,14 @@ sudoku.prototype.render = function () {
     if (window.console) {
         console.log("rendered in: " + ((new Date()).getTime() - stime));
     }
+
+    return this;
 }
 
-sudoku.prototype.show_grid_id = function () { $(this.gr.grid_id).show(); }
-sudoku.prototype.hide_grid_id = function () { $(this.gr.grid_id).hide(); }
+SudokuSolver.prototype.show_grid_id = function () { $(this.gr.grid_id).show(); }
+SudokuSolver.prototype.hide_grid_id = function () { $(this.gr.grid_id).hide(); }
 
-sudoku.prototype.select_grid = function (grid) {
+SudokuSolver.prototype.select_grid = function (grid) {
     if (this.rendered && this.agrid) {
         $(this.agrid.id_node).removeClass("active");
     }
@@ -898,12 +893,12 @@ sudoku.prototype.select_grid = function (grid) {
     if (this.rendered) {
         $(this.agrid.id_node).addClass("active");
     }
-    this.toggle('select_grid');
+    this.emit('select_grid');
     return this;
 }
 
 // .addhouse(type, grid, q);
-sudoku.prototype.addhouse = function (type, grid, q) {
+SudokuSolver.prototype.addhouse = function (type, grid, q) {
     if (this.state === -1) {
         throw {errmsg: "Cannot use addhouse while state = -1"};
     }
@@ -1022,7 +1017,7 @@ sudoku.prototype.addhouse = function (type, grid, q) {
 }
 
 // .gethouse(type, grid, q);
-sudoku.prototype.gethouse = function (type, grid, q) {
+SudokuSolver.prototype.gethouse = function (type, grid, q) {
     switch (type) {
       case 0: // it's a column
         return this.houses["_0_" + coord(this.m[grid.pos.x][grid.pos.y + q])];
@@ -1042,7 +1037,7 @@ sudoku.prototype.gethouse = function (type, grid, q) {
 
 // .delhouse(type, grid, q);
 // .delhouse(house);
-sudoku.prototype.delhouse = function (type, grid, q) {
+SudokuSolver.prototype.delhouse = function (type, grid, q) {
     if (this.state === -1) {
         throw {errmsg: "Cannot use delhouse while state = -1"};
     }
@@ -1084,33 +1079,42 @@ sudoku.prototype.delhouse = function (type, grid, q) {
     return true;
 }
 
+/*
+from math import floor, log
+def aa(n):
+    p = floor(log(26+25*n)/log(26))
+    n -= (26**p - 26) // 25
+    out = ""
+    while p:
+        out = chr(ord("A") + n % 26) + out
+        n //= 26
+        p -= 1
+    return out
+*/
+
 function aa(n) {
-    var letters = 26, first = "A";
-    var number = "", m = letters, j = 1;
-    while (n >= m) {
-        n -= m;
-        m *= letters;
-        j++;
+    var p = Math.floor(Math.log(26+25*n)/Math.log(26));
+    var out = "";
+    n -= Math.floor((Math.pow(26, p) - 26) / 25);
+    while (p) {
+        out = String.fromCharCode("A".charCodeAt(0) + n % 26) + out;
+        n = Math.floor(n / 26);
+        p -= 1
     }
-    while (j--) {
-        number = String.fromCharCode(first.charCodeAt(0) + n % letters) + number;
-        n -= n % letters;
-        n /= letters;
-    }
-    return number;
+    return out;
 }
 
 function coord(cell)  { return aa(cell.x) + (1 + cell.y); }
 function coordx(cell) { return aa(cell.x); }
 function coordy(cell) { return "" + (1 + cell.y); }
 
-sudoku.prototype.getcellbynumber = function (number) {
+SudokuSolver.prototype.getcellbynumber = function (number) {
     for (var y = 0; y < this.my; y++) for (var x = 0; x < this.mx; x++) if (this.m[x][y] && !number--) {
         return this.m[x][y];
     }
 }
 
-sudoku.prototype.selector_hide = function (now) {
+SudokuSolver.prototype.selector_hide = function (now) {
     if (now === true) {
         if (this.timers.selector) {
             clearTimeout(this.timers.selector);
@@ -1129,12 +1133,12 @@ sudoku.prototype.selector_hide = function (now) {
     }, 1000);
 }
 
-sudoku.prototype.solvelogclear = function (message) {
+SudokuSolver.prototype.solvelogclear = function (message) {
     this.loglines = [];
 //    this.nodes.log.html(message ? "<p>" + message + "</p>" : "");
 }
 
-sudoku.prototype.solvelog = function (type, o1, o2, o3, o4) {
+SudokuSolver.prototype.solvelog = function (type, o1, o2, o3, o4) {
     return;
     var line, n;
     n = this.loglines.push(line = {type: type});
@@ -1142,13 +1146,13 @@ sudoku.prototype.solvelog = function (type, o1, o2, o3, o4) {
       case 'naked_single':
         line.cells = o1;
         if (line.cells.length > 1) {
-            var clist = coord(line.cells[0]) + " — " + this.sym[line.cells[0].digit];
+            var clist = coord(line.cells[0]) + " — " + this.symb[line.cells[0].digit];
             for (var i = 1; i < line.cells.length; i++)
-                clist += "; " + coord(line.cells[i]) + " — " + this.sym[line.cells[i].digit];
+                clist += "; " + coord(line.cells[i]) + " — " + this.symb[line.cells[i].digit];
             this.nodes.log.append("<p>Naked singles in the cells " + clist + "</p>");
         } else {
             this.nodes.log.append("<p>Naked single in the cell " +
-                coord(line.cells[0]) + " — set to " + this.sym[line.cells[0].digit] + "</p>");
+                coord(line.cells[0]) + " — set to " + this.symb[line.cells[0].digit] + "</p>");
         }
         break;
       case 'hidden_single':
@@ -1156,7 +1160,7 @@ sudoku.prototype.solvelog = function (type, o1, o2, o3, o4) {
         line.house = o2;
         this.nodes.log.append("<p>Hidden single in the " + line.house.id + "-" +
             (["column", "row", "box", "diagonal", "antidiagonal"])[line.house.type] + " — set " +
-            coord(line.cell) + " to " + this.sym[line.cell.digit] + "</p>");
+            coord(line.cell) + " to " + this.symb[line.cell.digit] + "</p>");
         break;
       case 'naked_subset':
         line.cells = o1;
@@ -1166,9 +1170,9 @@ sudoku.prototype.solvelog = function (type, o1, o2, o3, o4) {
         for (var i = 1; i < line.cells.length; i++) {
             clist += ", " + coord(line.cells[i]);
         }
-        var dlist = this.sym[line.digits[0]];
+        var dlist = this.symb[line.digits[0]];
         for (var i = 1; i < line.digits.length; i++) {
-            dlist += ", " + this.sym[line.digits[i]];
+            dlist += ", " + this.symb[line.digits[i]];
         }
         this.nodes.log.append("<p>Naked " + (['', '', "pair", "triple", "quad"])[line.cells.length] + ": " +
             clist + " — removing " + dlist + " from common houses</p>");
@@ -1215,7 +1219,7 @@ function in_array(arr, value) {
     return false;
 }
 
-sudoku.prototype.solve_naked_subset = function () {
+SudokuSolver.prototype.solve_naked_subset = function () {
     var p, i, j, k, max = Math.floor(this.s / 2), cmax, empty, ret = 0;
     for (p in this.houses)
     if ((cmax = this.s - this.houses[p].filled - this.houses[p].ns - 2) > 0) {
@@ -1237,7 +1241,7 @@ sudoku.prototype.solve_naked_subset = function () {
     return ret;
 }
 
-sudoku.prototype.solve_naked_subset_rec = function (house, s, cells, m, start) {
+SudokuSolver.prototype.solve_naked_subset_rec = function (house, s, cells, m, start) {
     var i, j, z, k, mm, have, ch, w;
     for (z = start; z < cells.length; z++) {
         m.push(cells[z]);
@@ -1269,53 +1273,66 @@ sudoku.prototype.solve_naked_subset_rec = function (house, s, cells, m, start) {
     return false;
 }
 
-sudoku.prototype.solve1 = function () {
-    var x, y, k, cell, nstatus, errors = 0, stumps = 0, toset = [];
-    for (x = 0; x < this.mx; x++) for (y = 0; y < this.my; y++) if (this.m[x][y]) { // проверяем все ячейки по очереди
-        cell = this.m[x][y];
-        if (cell.digit) { // если в ячейке установлена цифра
-            if (cell.cand[cell.digit] != cell.houses.length) {
-                errors++;
-                if (cell.status != 1) {
-                    cell.status = 1;
-                    $(cell.g.node).removeClass('error-2').addClass('error-1');
+SudokuSolver.prototype.validate = function () {
+    var self = this;
+    var err, k, cell;
+    while (self.touched.length) {
+        cell = self.touched.pop();
+        cell.touched = false;
+        if (cell.digit) {
+            err = cell.cand[cell.digit] !== cell.houses.length;
+        } else {
+            for (k = 1, cell.rcand = []; k <= self.s; k += 1) {
+                if (!cell.cand[k] && !cell.mask[k]) {
+                    cell.rcand.push(k);
                 }
             }
-            else if (cell.status != 0) {
-                cell.status = 0;
-                $(cell.g.node).removeClass('error-1').removeClass('error-2');
+            err = cell.rcand.length === 0;
+            if (cell.rcand.length === 1) { // naked single
+                self.solver.nakedSingles.push(cell);
+            }
+            if (1 <= cell.rcand.length && cell.rcand.length <= 4) {
+                var newCand = cell.rcand.join(" ");
+                if (newCand !== cell.g.cand) {
+                    if (cell.g.cand !== false) {
+                        self.svg.remove($("text", cell.g.node));
+                    }
+                    cell.g.cand = newCand;
+                    self.svg.text(cell.g.node, cell.g.x + 1, cell.g.y + 8,
+                        cell.g.cand, {class_: "cand"});
+                }
+            } else if (cell.g.cand !== false) {
+                self.svg.remove($("text", cell.g.node));
+                cell.g.cand = false;
             }
         }
-        else { // если не установлена
-            for (k = 1, cell.rcand = []; k <= this.s; k++) {
-                if (cell.cand[k] || cell.mask[k]) continue;
-                cell.rcand.push(k);
+        if (err && !cell.error) {
+            cell.error = true;
+            self.errors += 1;
+            if (self.rendered) {
+                $(cell.g.node).addClass('error');
             }
-            if (cell.rcand.length == 0) {
-                stumps++;
-                if (cell.status != 2) {
-                    cell.status = 2;
-                    $(cell.g.node).removeClass('error-1').addClass('error-2');
-                }
+        } else if (!err && cell.error) {
+            cell.error = false;
+            self.errors -= 1;
+            if (self.rendered) {
+                $(cell.g.node).removeClass('error');
             }
-            else if (cell.status != 0) {
-                cell.status = 0;
-                $(cell.g.node).removeClass('error-1').removeClass('error-2');
-            }
-            if (cell.rcand.length == 1) // naked single
-                toset.push([cell, cell.rcand[0]]);
         }
     }
-    nstatus = errors ? 1 : (stumps ? 2 : 0);
-    if (this.state != nstatus) {
-        this.state = nstatus;
-        this.upd('stats');
+    if (self.errors && self.state === 0) {
+        self.state = 1;
+        self.upd('state');
+    } else if (self.errors === 0 && self.state === 1) {
+        self.state = 0;
+        self.upd('state');
     }
 
-    return toset;
+    this.upd('stats');
+    return self;
 }
 
-sudoku.prototype.solve2 = function () {
+SudokuSolver.prototype.solve2 = function () {
     var i, k, p, empty, ns, toset = [];
 
     for (p in this.houses) {
@@ -1333,7 +1350,7 @@ sudoku.prototype.solve2 = function () {
     return toset;
 }
 
-sudoku.prototype.upd = function () {
+SudokuSolver.prototype.upd = function () {
     for (var i = 0; i < arguments.length; i++) if (arguments[i]) {
         this.update_w[arguments[i]] = true;
     }
@@ -1349,23 +1366,25 @@ sudoku.prototype.upd = function () {
             t.solve();
         }
         if (update_w.stats) {
-            t.toggle('stats');
+            t.emit('stats');
         }
         if (update_w.update) {
-            t.toggle('update');
+            t.emit('update');
         }
     }, 1);
 }
 
-sudoku.prototype.solve = function () {
+SudokuSolver.prototype.solve = function () {
     this.solving = true;
-    var toset = this.solve1(); // naked singles, errors
-    if (toset.length) {
+    this.validate(); // naked singles, errors
+    if (this.solver.nakedSingles.length) {
         var cells = [];
-        for (var i = 0; i < toset.length; i++) {
-            this.select(toset[i][0], toset[i][1], 'solver');
-            cells.push(toset[i][0]);
+        while (this.solver.nakedSingles.length) {
+            var cell = this.solver.nakedSingles.pop();
+            this.select(cell, cell.rcand[0], 'solver');
+            cells.push(cell);
         }
+        console.log('nakedSingles:', cells)
         this.solvelog('naked_single', cells);
         this.upd('solve');
         return;
@@ -1385,10 +1404,10 @@ sudoku.prototype.solve = function () {
         this.upd('solve');
         return;
     }
-    if (this.solve_naked_subset()) {
-        this.upd('solve');
-        return;
-    }
+    //if (this.solve_naked_subset()) {
+    //    this.upd('solve');
+    //    return;
+    //}
     this.solving = false;
     for (var i = 0; i < this.aftersolve.length; i++) {
         this.aftersolve[i]();
@@ -1396,7 +1415,7 @@ sudoku.prototype.solve = function () {
     this.aftersolve = [];
 }
 
-sudoku.prototype.select_user = function (cell) {
+SudokuSolver.prototype.select_user = function (cell) {
     if (cell.digit && cell.source !== 'user') {
         if (this.rendered) {
             $("text", cell.g.node).removeClass(cell.source).addClass('user');
@@ -1408,7 +1427,7 @@ sudoku.prototype.select_user = function (cell) {
     return this;
 }
 
-sudoku.prototype.select = function (cell, k, source, force) {
+SudokuSolver.prototype.select = function (cell, k, source, force) {
     var i, j, p;
     if (!this.sources[source]) {
 //        this.wlog("unrecognized source: " + source, 'warning');
@@ -1419,11 +1438,11 @@ sudoku.prototype.select = function (cell, k, source, force) {
         return false;
     }
     if (cell.digit) {
-//        this.wlog(source + " tries to select " + this.sym[k] + " at " + coord(cell) + " - its already set to " + this.sym[cell.digit], 'warning');
+//        this.wlog(source + " tries to select " + this.symb[k] + " at " + coord(cell) + " - its already set to " + this.symb[cell.digit], 'warning');
         return false;
     }
     if (!force && (cell.cand[k] || cell.mask[k])) {
-//        this.wlog(source + " tries to select " + this.sym[k] + " at " + coord(cell) + " - its not possible" + (cell.mask[k] ? " (masked)" : ""), 'warning');
+//        this.wlog(source + " tries to select " + this.symb[k] + " at " + coord(cell) + " - its not possible" + (cell.mask[k] ? " (masked)" : ""), 'warning');
         return false;
     }
     if (this.solving && source !== 'solver') {
@@ -1432,27 +1451,34 @@ sudoku.prototype.select = function (cell, k, source, force) {
 
     cell.digit = +k;
     cell.source = source;
-    this.filled++;
+    this.filled += 1;
     if (source === 'user') {
-        s.ufilled++;
+        s.ufilled += 1;
     }
 
     for (p in cell.houses) {
-        cell.houses[p].filled++;
-        for (i = 0; i < this.s; i++) {
-            cell.houses[p][i].cand[k]++;
+        cell.houses[p].filled += 1;
+        for (i = 0; i < this.s; i += 1) {
+            cell.houses[p][i].cand[k] += 1;
+            if (!cell.houses[p][i].touched) {
+                cell.houses[p][i].touched = true;
+                this.touched.push(cell.houses[p][i]);
+            }
         }
     }
 
     if (this.rendered) {
+        if (cell.g.cand !== false) {
+            this.svg.remove($("text", cell.g.node));
+            cell.g.cand = false;
+        }
         this.svg.text(cell.g.node,
-            cell.g.x + this.g.tx,
-            cell.g.y + this.g.ty,
-            this.sym[cell.digit],
-            {class_: source});
+            cell.g.x + this.g.tx, cell.g.y + this.g.ty,
+            this.symb[cell.digit], {class_: source});
     }
+
     if (this.interactive && cell === this.acell) {
-        this.select_next();
+    //    this.select_next();
     }
 
     this.upd('stats', source === 'user' ? 'update' : void 0, source !== 'solver' ? 'solve' : void 0);
@@ -1460,7 +1486,7 @@ sudoku.prototype.select = function (cell, k, source, force) {
     return true;
 }
 
-sudoku.prototype.clear = function () {
+SudokuSolver.prototype.clear = function () {
     if (this.solving) {
         return false;
     }
@@ -1470,7 +1496,7 @@ sudoku.prototype.clear = function () {
     }
 }
 
-sudoku.prototype.resolve = function () {
+SudokuSolver.prototype.resolve = function () {
     var p, i, j, k, cell;
     for (p in this.houses) {
         this.houses[p].ns = 0;
@@ -1488,55 +1514,62 @@ sudoku.prototype.resolve = function () {
     this.upd('solve');
 }
 
-sudoku.prototype.cancel = function (cell, source) {
+SudokuSolver.prototype.cancel = function (cell, source) {
+    var self = this;
     var i, j, k;
 
-    if (!cell.digit) {
-//        this.wlog(source + " tries to cancel " + coord(cell) + " - its empty", 'warning');
-        return false;
+    if (!self.isCell(cell)) {
+        throw {errmsg: "No such cell"};
+    }
+    if (cell.digit === 0) {
+        throw {errmsg: source + " tries to cancel " + coord(cell) + " - its empty"};
     }
     if (cell.source !== source) {
-//        if (source != 'user')
-//            this.wlog(source + " tries to cancel " + coord(cell) + " - access denied", 'warning');
-        return false;
+        throw {errmsg: source + " tries to cancel " + coord(cell) + " - access denied"};
     }
     if (this.solving) {
         return false;
     }
     k = cell.digit;
     cell.digit = 0;
-    this.filled--;
+    self.filled -= 1;
     if (source === 'user') {
-        s.ufilled--;
+        self.ufilled -= 1;
     }
 
     for (p in cell.houses) {
-        cell.houses[p].filled--;
-        for (i = 0; i < this.s; i++) {
-            cell.houses[p][i].cand[k]--;
+        cell.houses[p].filled -= 1;
+        for (i = 0; i < self.s; i += 1) {
+            cell.houses[p][i].cand[k] -= 1;
+            if (!cell.houses[p][i].touched) {
+                cell.houses[p][i].touched = true;
+                self.touched.push(cell.houses[p][i]);
+            }
         }
     }
 
     if (this.rendered) {
-        this.svg.remove($("text", cell.g.node));
+        self.svg.remove($("text", cell.g.node));
     }
-    this.upd('stats', source === 'user' ? 'update' : void 0);
-    this.resolve();
+    self.upd('stats', source === 'user' ? 'update' : void 0);
+    if (source !== "solver") {
+        self.resolve();
+    }
 
     return true;
 }
 
 /**  Guess-and-check solver  **/
 
-sudoku.prototype.gnc_start = function () {
+SudokuSolver.prototype.gnc_start = function () {
     if (this.gnc) {
         return;
     }
     this.gnc = true;
     this.gnc_cycle();
-    this.toggle('gnc_state');
+    this.emit('gnc_state');
 }
-sudoku.prototype.gnc_stop = function () {
+SudokuSolver.prototype.gnc_stop = function () {
     if (!this.gnc) {
         return;
     }
@@ -1545,23 +1578,23 @@ sudoku.prototype.gnc_stop = function () {
         this.timers.gnc = false;
     }
     this.gnc = false;
-    this.toggle('gnc_state');
+    this.emit('gnc_state');
 }
-sudoku.prototype.gnc_toggle = function () {
+SudokuSolver.prototype.gnc_toggle = function () {
     if (this.gnc) {
         this.gnc_stop();
     } else {
         this.gnc_start();
     }
 }
-sudoku.prototype.gnc_reset = function () {
+SudokuSolver.prototype.gnc_reset = function () {
     for (var j = this.my-1; j >= 0; j--) for (var i = this.mx-1; i >= 0; i--) if (
         this.m[i][j] && this.m[i][j].digit && this.m[i][j].source === 'gnc') {
         this.cancel(this.m[i][j], 'gnc');
     }
 }
 
-sudoku.prototype.gnc_cancel = function () {
+SudokuSolver.prototype.gnc_cancel = function () {
     if (!this.gnc || this.timers.gnc) return;
     var l = false, k, t = this;
     for (var j = this.my-1; j >= 0; j--) for (var i = this.mx-1; i >= 0; i--) if (
@@ -1572,7 +1605,7 @@ sudoku.prototype.gnc_cancel = function () {
     }
     if (!l) {
         this.gnc = false;
-        this.toggle('gnc_state');
+        this.emit('gnc_state');
         return;
     }
     this.cancel(l, 'gnc');
@@ -1597,7 +1630,7 @@ sudoku.prototype.gnc_cancel = function () {
     });
 }
 
-sudoku.prototype.gnc_cycle = function () {
+SudokuSolver.prototype.gnc_cycle = function () {
     if (!this.gnc || this.timers.gnc) return;
     var t = this;
     if (this.state) {
@@ -1606,7 +1639,7 @@ sudoku.prototype.gnc_cycle = function () {
     }
     if (this.filled === this.total) {
         this.gnc = false;
-        this.toggle('gnc_state');
+        this.emit('gnc_state');
         return;
     }
     for (var j = 0; j < this.my; j++) for (var i = 0; i < this.mx; i++)
@@ -1619,5 +1652,5 @@ sudoku.prototype.gnc_cycle = function () {
         return;
     }
     this.gnc = false;
-    this.toggle('gnc_state');
+    this.emit('gnc_state');
 }

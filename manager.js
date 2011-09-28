@@ -138,7 +138,7 @@ $(function () {
             }
         });
 
-    s = new sudoku($("#sudoku"));
+    s = new SudokuSolver({node: $("#sudoku")});
 
     $("#help-toggle").click(function () {
         $("#help").show();
@@ -296,7 +296,7 @@ $(function () {
 
     //// Sudoku events
 
-    s.bind('stats', function () { // optimizeable
+    s.on('stats', function () { // optimizeable
         $("#stats .labeltext")
             .html("Filled: " + this.filled + "/" + this.total + " &mdash; " + Math.floor(100 * this.filled / this.total) + "&nbsp;%");
         $("#stats .ddnode")
@@ -312,7 +312,7 @@ $(function () {
         var pre = (edata.url ? location.protocol + "//" + location.hostname + location.pathname + "#" : "")
             + (edata.map ? edata.txtmap : "");
         $("#solution_txt").val(pre + (edata.data ? this.export_solution() : ""));
-    }).bind('update', function () {
+    }).on('update', function () {
         var e = this.export_all();
         edata.txtmap = e.map;
         edata.txt = e.map + e.data;
@@ -323,7 +323,7 @@ $(function () {
             + (edata.map ? e.map : "");
         $("#export_txt").val(pre + (edata.data ? e.data : ""));
         $("#solution_txt").val(pre + (edata.data ? e.solution : ""));
-    }).bind('load', function () {
+    }).on('load', function () {
         console.log(this);
         var html = "", t = this;
         if (this.grids.length > 1) {
@@ -346,7 +346,7 @@ $(function () {
         if ($("#left").hasClass("opened") && $("#left-tabs input:checked").val() === "options" && this.grids.length > 1) {
             this.show_grid_id();
         }
-    }).bind('select_grid', function () {
+    }).on('select_grid', function () {
         $("#diag_1")
             .attr("disabled", !this.agrid)
             .attr("checked", !!(this.agrid && this.gethouse(3, this.agrid)));
@@ -356,7 +356,7 @@ $(function () {
         if (this.agrid) {
             $("#selectgrid" + this.agrid.id).attr("checked", true);
         }
-    }).bind('gnc_state', function () {
+    }).on('gnc_state', function () {
         $("#gnc-toggle").html(this.gnc ? "&#9724; Stop" : "&#9656; Start");
     });
 
