@@ -54,10 +54,47 @@ nav.panel::after {
 }
 nav#panel {
     position: fixed;
-    top: 0;
-    left: 0;
-    z-index: 101;
+    width: 100%;
+    background-color: #f2f2f2;
+    top: 0px;
+    left: 0px;
+    box-shadow: 2px 2px 2px #bbb;
+    padding: 8px 15px;
+    color: black;
+    font-size: 11pt;
+    cursor: default;
+    box-sizing: border-box;
 }
+
+#panel a:link, #panel a:visited {
+    text-decoration: none;
+    color: #444;
+    border: 1px solid #ccc;
+    padding: 5px 15px;
+    margin: 0 4px;
+    border-radius: 3px;
+    background-color: #eee;
+    float: left;
+}
+
+#helpToggle {
+    float: right !important;
+}
+
+#takeStep {
+    color: #ccc !important;
+}
+
+#takeStep.enabled {
+    color: #000 !important;
+    border-color: orange !important;
+    box-shadow: 0 0 2px orange;
+}
+
+#panel a:active, #panel a.active {
+    background-color: #ddd;
+}
+
 #left .panel {
     margin: 10px 0;
 }
@@ -209,6 +246,40 @@ nav#panel {
     background-color: rgba(255, 0, 0, 0.2);
 }
 
+#solvingTechniques {
+    display: none;
+    position: fixed;
+    width: 200px;
+    background-color: #f3f3f3;
+    box-shadow: 2px 2px 3px #ccc;
+    border: 1px solid #ccc;
+    border-top: none;
+}
+
+#solvingTechniques h3 {
+    font-size: inherit;
+    margin: 0;
+    padding: 0;
+}
+
+#solvingTechniques table .fixed {
+    width: 1px;
+}
+#solvingTechniques table {
+    width: 100%;
+}
+#solvingTechniques thead {
+    font-weight: bolder;
+}
+
+#sudokuVariations {
+    display: none;
+    position: fixed;
+    width: 275px;
+    background-color: white;
+    overflow-y: scroll;
+}
+
 #stats .errors {
     color: #f88;
 }
@@ -233,7 +304,7 @@ div#sudoku {
     min-height: 100%;
 }
 div#sudoku > svg {
-    margin: 20px 280px;
+    margin: 30px 100px;
 }
 
 #left-toggle + .elem .labeltext::before {
@@ -321,6 +392,15 @@ div#sudoku > svg {
 
 #helpclose {
     width: 100%;
+}
+
+#sbsInfoBox {
+}
+
+.cellRef {
+    text-decoration: underline;
+    color: #333;
+    cursor: default;
 }
 
 }

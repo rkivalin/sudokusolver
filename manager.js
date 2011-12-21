@@ -7,36 +7,35 @@ var profiles = [
     }, {
         title: {en: "Sudoku-X", ru: "Судоку-X"},
         img: 'sudoku9x.svg',
-        map: "h=3;0,h=4;0,", s: 9
+        map: "h=diag1:A1,h=diag2:A9", s: 9
     }, {
         title: {en: "Gattai-2", ru: "Gattai-2"},
         img: 'gattai2.svg',
-        map: "0;0,6;6,", s: 9
+        map: "0:0,6:6", s: 9
     }, {
         title: {en: "Sohei", ru: "Sohei"},
         img: 'sohei.svg',
-        map: "0;6,6;0,12;6,6;12,", s: 9
+        map: "0:6,6:0,12:6,6:12", s: 9
     }, {
         title: {en: "Samurai", ru: "Самурай"},
         img: 'samurai.svg',
-        map: "0;0,6;6,0;12,12;0,12;12,", s: 9
+        map: "0:0,6:6,0:12,12:0,12:12", s: 9
     }, {
         title: {en: "Sudoku 6x6", ru: "Судоку 6x6"},
         img: 'sudoku6.svg',
-        map: "2x3,", s: 6
+        map: "3x2", s: 6
     }, {
         title: {en: "Sudoku 16x16", ru: "Судоку 16x16"},
         img: 'sudoku-16x16.png',
-        map: "4x4,", s: 16
+        map: "4x4", s: 16
     }, {
         title: {en: "Sudoku 25x25", ru: "Судоку 25x25"},
         img: 'sudoku-16x16.png',
-        map: "5x5,", s: 25
+        map: "5x5", s: 25
     }
 ];
 
 var s = false; /// Main sudoku
-var edata = {url: false, map: false, data: false, txt: "", solution: ""};
 
 var renotify = false;
 
@@ -53,27 +52,27 @@ function load_sudoku(sudoku) {
     if (location.hash.substr(1).length) {
         renotify = true;
     }
-    save_state();
-    s.import_txt(sudoku);
+    save_state(location.hash.substr(1));
+    s.load(sudoku);
 }
 
 if (Modernizr.history) {
-    window.update_state = function () {
-        if (location.hash !== "#" + edata.txt) {
-            history.replaceState(void 0, "", "#" + edata.txt);
+    window.update_state = function (state) {
+        if (location.hash !== "#" + state) {
+            history.replaceState(void 0, "", "#" + state);
         }
     };
-    window.save_state = function () {
-        if ((edata.txt.length || location.hash.length) && location.hash !== "#" + edata.txt) {
+    window.save_state = function (state) {
+        if ((state.length || location.hash.length) && location.hash !== "#" + state) {
             window.hashupdate = true;
         }
-        history.pushState(void 0, "", "#" + edata.txt);
+        history.pushState(void 0, "", "#" + state);
     };
 } else if (Modernizr.hashchange) {
-    window.update_state = function () {
-        if ((edata.txt.length || location.hash.length) && location.hash !== "#" + edata.txt) {
+    window.update_state = function (state) {
+        if ((state.length || location.hash.length) && location.hash !== "#" + state) {
             window.hashupdate = true;
-            location.replace("#" + edata.txt);
+            location.replace("#" + state);
         }
     };
     window.save_state = function () {
@@ -97,7 +96,7 @@ $(function () {
                 return;
             }
             console.log("load " + location.hash.substr(1));
-            s.import_txt(location.hash.substr(1));
+            s.load(location.hash.substr(1));
             if (renotify) {
                 notify(
                     "You can restore your previous sudoku by clicking <a href=\"#\">back</a> in your browser.",
@@ -109,6 +108,60 @@ $(function () {
             }
         };
     }
+
+    var newSudokuOpened = false;
+    var openNewSudoku = function () {
+        closeSolvingTechniques();
+        $("#sudokuVariationsSwitch").addClass("active");
+        $("#sudokuVariations").show();
+        newSudokuOpened = true;
+        if ($("#left-tabs input:checked").val() === "options" && s.grids.length > 1) {
+            renderer.showGridId();
+        }
+    };
+    var closeNewSudoku = function () {
+        $("#sudokuVariationsSwitch").removeClass("active");
+        $("#sudokuVariations").hide();
+        newSudokuOpened = false;
+        renderer.hideGridId();
+    };
+    var toggleNewSudoku = function () {
+        if (newSudokuOpened) {
+            closeNewSudoku();
+        } else {
+            openNewSudoku();
+        }
+    };
+
+    var solvingTechniquesOpened = false;
+    var openSolvingTechniques = function () {
+        closeNewSudoku();
+        $("#solvingTechniquesSwitch").addClass("active");
+        $("#solvingTechniques").show();
+        solvingTechniquesOpened = true;
+    };
+    var closeSolvingTechniques = function () {
+        $("#solvingTechniquesSwitch").removeClass("active");
+        $("#solvingTechniques").hide();
+        solvingTechniquesOpened = false;
+    };
+    var toggleSolvingTechniques = function () {
+        if (solvingTechniquesOpened) {
+            closeSolvingTechniques();
+        } else {
+            openSolvingTechniques();
+        }
+    };
+
+    $("#sudokuVariationsSwitch").click(function () {
+        toggleNewSudoku();
+        return false;
+    });
+
+    $("#solvingTechniquesSwitch").click(function () {
+        toggleSolvingTechniques();
+        return false;
+    });
 
     /// Sudoku variants
 
@@ -126,6 +179,7 @@ $(function () {
             return false;
         }
         load_sudoku(this.href.substr(this.href.indexOf("#") + 1));
+        closeNewSudoku();
         return false;
     });
 
@@ -138,9 +192,11 @@ $(function () {
             }
         });
 
-    s = new SudokuSolver({node: $("#sudoku")});
+    s = new SudokuGrid();
+    renderer = new SudokuRenderer({grid: s, node: $("#sudoku"), interactive: true, keyboard: true});
+    solver = new SudokuSolver({grid: s, solve: true, gncSpeed: 100});
 
-    $("#help-toggle").click(function () {
+    $("#helpToggle").click(function () {
         $("#help").show();
         return false;
     });
@@ -152,27 +208,27 @@ $(function () {
         if (this.checked) {
             $("#left").addClass("opened");
             if ($("#left-tabs input:checked").val() === "options" && s.grids.length > 1) {
-                s.show_grid_id();
+                renderer.showGridId();
             }
         } else {
             $("#left").removeClass("opened");
-            s.hide_grid_id();
+            renderer.hideGridId();
         }
     });
     $("#options").add("#sudokutype").css({display: 'none'});
     $("#left-tabs input[name=tab]").click(function () {
         if (this.value === "options") {
             if (s.grids.length > 1) {
-                s.show_grid_id();
+                renderer.showGridId();
             }
             $("#sudokutype").add("#custom").css({display: 'none'});
             $("#options").css({display: 'block'});
         } else if (this.value === "custom") {
-            s.hide_grid_id();
+            renderer.hideGridId();
             $("#sudokutype").add("#options").css({display: 'none'});
             $("#custom").css({display: 'block'});
         } else {
-            s.hide_grid_id();
+            renderer.hideGridId();
             $("#options").add("#custom").css({display: 'none'});
             $("#sudokutype > div").css({display: 'none'});
             $("#sudokutype > div[data-size=" + this.value + "]").css({display: 'block'});
@@ -189,18 +245,13 @@ $(function () {
 
     //// Sudoku control
 
-    // Show steps button
-    $("#showsteps").click(function () {
-
-    });
-
     // Clear button
     $("#clear").click(function () {
         if (s.filled === 0) {
             return;
         }
         if (s.ufilled) {
-            save_state();
+            save_state(location.hash.substr(1));
             notify(
                 "Sudoku cleared. <a href=\"#\">Cancel.</a>",
                 function () {
@@ -212,34 +263,19 @@ $(function () {
     });
 
     // Export
-    edata.url = $("#export_url")
-        .click(function () {
-            edata.url = this.checked;
-            s.toggle("update");
-        }).attr('checked');
-    edata.map = $("#export_map")
-        .click(function () {
-            edata.map = this.checked;
-            s.toggle("update");
-        }).attr('checked');
-    edata.data = $("#export_data")
-        .click(function () {
-            edata.data = this.checked;
-            s.toggle("update");
-        }).attr('checked');
     $("#export_txt").add("#solution_txt").click(function () {
         this.selectionStart = 0;
         this.selectionEnd = this.value.length;
     });
 
     // Toggle guess-and-check button
-    $("#gnc-toggle").click(function () {
-        s.gnc_toggle();
+    $("#gncToggle").click(function () {
+        solver.gncToggle();
     });
 
     // Reset guess-and-check button
-    $("#gnc-reset").click(function () {
-        s.gnc_reset();
+    $("#gncReset").click(function () {
+        solver.gncReset();
     });
 
     // Import sudoku
@@ -253,25 +289,25 @@ $(function () {
 
     // Main diagonal switch
     $("#diag_1").click(function () {
-        if (!s.agrid) { // no grid selected
+        if (!renderer.agrid) { // no grid selected
             return;
         }
         if (this.checked) {
-            s.addhouse(3, s.agrid);
+            s.addHouse('diag1', renderer.agrid.pos);
         } else {
-            s.delhouse(3, s.agrid);
+            s.delHouse('diag1', renderer.agrid.pos);
         }
     });
 
     // Anti-diagonal switch
     $("#diag_2").click(function () {
-        if (!s.agrid) { // no grid selected
+        if (!renderer.agrid) { // no grid selected
             return;
         }
         if (this.checked) {
-            s.addhouse(4, s.agrid);
+            s.addHouse('diag2', renderer.agrid.pos.step(0, s.s - 1));
         } else {
-            s.delhouse(4, s.agrid);
+            s.delHouse('diag2', renderer.agrid.pos.step(0, s.s - 1));
         }
     });
     // Windoku switch
@@ -296,74 +332,183 @@ $(function () {
 
     //// Sudoku events
 
-    s.on('stats', function () { // optimizeable
+    var msgs = {};
+    var errCells = {};
+    var eProc = function (cell, action, obj) {
+        if (action === 'error') {
+            errCells[cell.id] = true;
+        } else {
+            delete errCells[cell.id];
+        }
+        cell = null;
+        for (var i in errCells) {
+            cell = s.getCellByAddr(i);
+            break;
+        }
+        if (msgs.error != null) {
+            obj.removeMessage(msgs.error);
+            delete msgs.error;
+        }
+        if (cell != null) {
+            var e;
+            if (cell.digit) {
+                e = "Duplicate digit in the house: " + cell.id;
+            } else {
+                e = "Cann't set any digit in the cell " + cell.id;
+            }
+            msgs.error = obj.message(e + " &mdash; try to undo your last action (Ctrl+Z)");
+        }
+    };
+
+    s.on('error', function (cell) { eProc(cell, 'error', this); })
+    .on('fix', function (cell) { eProc(cell, 'fix', this); })
+    .on('change', function () {
+        if (!this.errors && this.filled === this.total) {
+            if (msgs.complete == null) {
+                msgs.complete = this.message("Congratulations! Sudoku solved.");
+            }
+        } else if (msgs.complete != null) {
+            this.removeMessage(msgs.complete);
+            delete msgs.complete;
+        }
         $("#stats .labeltext")
             .html("Filled: " + this.filled + "/" + this.total + " &mdash; " + Math.floor(100 * this.filled / this.total) + "&nbsp;%");
         $("#stats .ddnode")
             .html(
                 "<p>Givens: " + this.ufilled + "/" + this.total + " &mdash; " + Math.floor(100 * this.ufilled / this.total) + "&nbsp;%</p>" +
-                (this.state ? "<p class=\"errors\">there are errors</p>" : "")
+                (this.errors ? "<p class=\"errors\">there are errors</p>" : "")
             );
-        if (this.state) {
+        if (this.errors) {
             $("#stats").addClass("red");
         } else {
             $("#stats").removeClass("red");
         }
-        var pre = (edata.url ? location.protocol + "//" + location.hostname + location.pathname + "#" : "")
-            + (edata.map ? edata.txtmap : "");
-        $("#solution_txt").val(pre + (edata.data ? this.export_solution() : ""));
-    }).on('update', function () {
-        var e = this.export_all();
-        edata.txtmap = e.map;
-        edata.txt = e.map + e.data;
-        edata.solution = e.map + e.solution;
-        localStorage.restore = edata.txt;
-        update_state();
-        var pre = (edata.url ? location.protocol + "//" + location.hostname + location.pathname + "#" : "")
-            + (edata.map ? e.map : "");
-        $("#export_txt").val(pre + (edata.data ? e.data : ""));
-        $("#solution_txt").val(pre + (edata.data ? e.solution : ""));
-    }).on('load', function () {
-        console.log(this);
+        var map = this.saveMap();
+        var data = this.saveData();
+        var all = map + (map.length && data.length ? ',' : '') + data
+        localStorage.restore = all;
+        update_state(all);
+        var url = location.protocol + "//" + location.hostname + location.pathname + "#" + all;
+        $("#export_txt").val(url);
+        //$("#solution_txt").val(url);
+    }).on('loadMap', function () {
         var html = "", t = this;
         if (this.grids.length > 1) {
             var html = "Configure grid: ";
             for (var i = 0; i < this.grids.length; i++) {
                 html += '<label><input type="radio" id="selectgrid' + i
                     + '" name="selectgrid" value="' + i + '"'
-                    + (this.grids[i] === this.agrid ? ' checked' : '')
+                    + (this.grids[i] === renderer.agrid ? ' checked' : '')
                     + ' />' + (1+i) + '</label>&ensp;';
             }
         }
         $("#selectgrid").html(html);
         $("#diag_1")
-            .attr("disabled", !this.agrid)
-            .attr("checked", !!(this.agrid && this.gethouse(3, this.agrid)));
+            .attr("disabled", !renderer.agrid)
+            .attr("checked", !!(renderer.agrid && this.getHouse('diag1', renderer.agrid.pos)));
         $("#diag_2")
-            .attr("disabled", !this.agrid)
-            .attr("checked", !!(this.agrid && this.gethouse(4, this.agrid)));
-        $("#selectgrid input[name=selectgrid]").click(function () { t.select_grid(this.value); });
+            .attr("disabled", !renderer.agrid)
+            .attr("checked", !!(renderer.agrid && this.getHouse('diag2', renderer.agrid.pos.step(0, this.s-1))));
+        $("#selectgrid input[name=selectgrid]").click(function () { renderer.selectGrid(this.value); });
         if ($("#left").hasClass("opened") && $("#left-tabs input:checked").val() === "options" && this.grids.length > 1) {
-            this.show_grid_id();
+            renderer.showGridId();
         }
-    }).on('select_grid', function () {
+    }).on('message', function (html) {
+        $("#sbsInfoText").html(html);
+    });
+    renderer.on('selectGrid', function () {
         $("#diag_1")
             .attr("disabled", !this.agrid)
-            .attr("checked", !!(this.agrid && this.gethouse(3, this.agrid)));
+            .attr("checked", !!(this.agrid && s.getHouse('diag1', this.agrid.pos)));
         $("#diag_2")
             .attr("disabled", !this.agrid)
-            .attr("checked", !!(this.agrid && this.gethouse(4, this.agrid)));
+            .attr("checked", !!(this.agrid && s.getHouse('diag2', this.agrid.pos.step(0, s.s-1))));
         if (this.agrid) {
             $("#selectgrid" + this.agrid.id).attr("checked", true);
         }
-    }).on('gnc_state', function () {
-        $("#gnc-toggle").html(this.gnc ? "&#9724; Stop" : "&#9656; Start");
+    });
+    solver.on('gncStart', function () {
+        $("#gncToggle").html("&#9724; Stop");
+    }).on('gncStop', function () {
+        $("#gncToggle").html("&#9656; Start");
+    }).on('waitStep', function () {
+        $("#takeStep").addClass("enabled");
+    }).on('solve', function () {
+        $("#takeStep").removeClass("enabled");
+    });
+    $("#takeStep").click(function () {
+        if ($(this).hasClass("enabled")) {
+            solver.step();
+        }
+        return false;
+    });
+
+    var savedConfig;
+    try {
+        savedConfig = JSON.parse(localStorage.techniques);
+    } catch (e) {
+        savedConfig = {
+            solving: true,
+            stepbystep: true,
+            NakedSingles: [true, true],
+            HiddenSingles: [true, true],
+            NakedSubsets: [true, true]
+        };
+    }
+    var sw = function (prop, sbs, value) {
+        solver.technique(prop, sbs, value);
+        if (savedConfig[prop][sbs ? 1 : 0] !== value) {
+            savedConfig[prop][sbs ? 1 : 0] = value;
+            localStorage.techniques = JSON.stringify(savedConfig);
+        }
+    };
+    var chgFunc = function (sbs, prop) {
+        return function () {
+            sw(prop, sbs, this.checked);
+        };
+    }
+    solver.sbs = savedConfig.stepbystep;
+    $("#enableSbSSolver").prop("checked", savedConfig.stepbystep).change(function () {
+        solver.sbs = this.checked;
+        savedConfig.stepbystep = this.checked;
+        localStorage.techniques = JSON.stringify(savedConfig);
+    });
+    solver.solve = savedConfig.solving;
+    $("#enableSolver").prop("checked", savedConfig.solving).change(function () {
+        solver.solve = this.checked;
+        if (solver.solve) {
+            solver._change();
+        }
+        savedConfig.solving = this.checked;
+        localStorage.techniques = JSON.stringify(savedConfig);
+    });
+    sw('NakedSingles', false, savedConfig.NakedSingles[0]);
+    sw('NakedSingles', true, savedConfig.NakedSingles[1]);
+    $("#NakedSinglesSwitch").prop("checked", savedConfig.NakedSingles[0]).change(chgFunc(false, 'NakedSingles'));
+    $("#NakedSinglesSbS").prop("checked", savedConfig.NakedSingles[1]).change(chgFunc(true, 'NakedSingles'));
+    sw('HiddenSingles', false, savedConfig.HiddenSingles[0]);
+    sw('HiddenSingles', true, savedConfig.HiddenSingles[1]);
+    $("#HiddenSinglesSwitch").prop("checked", savedConfig.HiddenSingles[0]).change(chgFunc(false, 'HiddenSingles'));
+    $("#HiddenSinglesSbS").prop("checked", savedConfig.HiddenSingles[1]).change(chgFunc(true, 'HiddenSingles'));
+    sw('NakedSubsets', false, savedConfig.NakedSubsets[0]);
+    sw('NakedSubsets', true, savedConfig.NakedSubsets[1]);
+    $("#NakedSubsetsSwitch").prop("checked", savedConfig.NakedSubsets[0]).change(chgFunc(false, 'NakedSubsets'));
+    $("#NakedSubsetsSbS").prop("checked", savedConfig.NakedSubsets[1]).change(chgFunc(true, 'NakedSubsets'));
+
+    $("#resetSolution").click(function () {
+        var cell = s.headCell;
+        while (cell) {
+            if (cell.digit && cell.source === 'solver') {
+                cell.unset(cell.source);
+            }
+            cell = cell.next;
+        }
     });
 
     /// Initialize sudoku
 
     if (location.hash.length > 1) {
-        s.import_txt(location.hash.substr(1));
+        s.load(location.hash.substr(1));
         var l = localStorage.restore, h = location.hash.substr(1), s1 = "", s2;
         if (l !== h) {
             s1 = " or <a href=\"#\">load from storage</a>";
@@ -378,20 +523,27 @@ $(function () {
             },
             s2);
     } else if (localStorage.restore) {
-        s.import_txt(localStorage.restore);
+        s.load(localStorage.restore);
         notify(
             "Loading sudoku from storage. (<a href=\"#\">Load default sudoku</a>)",
             function () {
                 load_sudoku("");
             });
     } else {
-        s.import_txt("");
+        s.load("");
     }
 
     // keyboard shortcuts
     $(document).keydown(function (e) {
+        var ret;
         if (!e.ctrlKey && !e.altKey && !e.shiftKey) switch (e.which) {
             case 27: // Esc
+                break;
+            case 32: // Space
+                if (solver.state >= 0) {
+                    solver.step();
+                }
+                ret = false;
                 break;
             case 192: // `
                 /*console_toggle();*/
@@ -421,7 +573,22 @@ $(function () {
                 break;
         }
         the = e;
+        return ret;
     });
+
+    var fitNewSudoku = function () {
+        $("#sudokuVariations").css({
+            height: (window.innerHeight - 17 - $("#panel").outerHeight()) + 'px',
+            top: $("#panel").outerHeight() + 'px'
+        });
+        $("#solvingTechniques").css({
+            top: $("#panel").outerHeight() + 'px',
+            left: Math.floor($("#solvingTechniquesSwitch").position().left +
+                $("#solvingTechniquesSwitch").outerWidth() / 2 - 100) + 'px'
+        });
+    };
+    $(window).resize(fitNewSudoku);
+    setTimeout(function () { fitNewSudoku(); }, 1);
 
     $("#loadscreen").css({display: "none"});
 });

@@ -1,1656 +1,2861 @@
-
-function array(dim, value, level) {
-    var i, arr = [];
-    if (level === void 0) {
-        level = 0;
+(function() {
+  var DLList, DLSet, HiddenSingles, HouseList, NakedSingles, NakedSubsets, SudokuCell, SudokuGrid, SudokuRenderer, SudokuSolver, extend, _aa, _aa2i;
+  var __hasProp = Object.prototype.hasOwnProperty, __extends = function(child, parent) {
+    for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; }
+    function ctor() { this.constructor = child; }
+    ctor.prototype = parent.prototype;
+    child.prototype = new ctor;
+    child.__super__ = parent.prototype;
+    return child;
+  }, __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; }, __indexOf = Array.prototype.indexOf || function(item) {
+    for (var i = 0, l = this.length; i < l; i++) {
+      if (this[i] === item) return i;
     }
-    if (typeof dim !== 'object' && !(dim instanceof Array)) {
-        dim = [dim];
+    return -1;
+  };
+  extend = function(to, from) {
+    var i;
+    if (from != null) {
+      for (i in from) {
+        to[i] = from[i];
+      }
     }
-    if (dim.length === 1+level) {
-        if (value !== void 0) {
-            for (i = 0; i < dim[level]; i += 1) {
-                arr[i] = value;
-            }
+    return null;
+  };
+  Array.prototype.fill = function(dim, value, level) {
+    var i, _ref, _ref2;
+    if (level == null) {
+      level = 0;
+    }
+    if (typeof dim === 'number' && (value != null) && dim > 0) {
+      for (i = 0; i < dim; i += 1) {
+        this[i] = value;
+      }
+      return this;
+    }
+    if (dim[level] < 0) {
+      return this;
+    }
+    if (dim.length === 1 + level) {
+      if (value != null) {
+        for (i = 0, _ref = dim[level]; i < _ref; i += 1) {
+          this[i] = value;
         }
+      }
     } else {
-        for (i = 0; i < dim[level]; i += 1) {
-            arr[i] = array(dim, value, 1 + level);
-        }
-    }
-    return arr;
-}
-
-function array_del(arr, index) {
-    if (+index >= arr.length) {
-        return;
-    }
-    for (var i = 1 + index; i < arr.length; i += 1) {
-        arr[i - 1] = arr[i];
-    }
-    arr.pop();
-}
-
-function array_del_value(arr, value) {
-    for (var i = 0; i < arr.length; i++) if (arr[i] === value) {
-        array_del(arr, i--);
-    }
-}
-
-function str_pad(input, pad_length, pad_string, pad_type) {
-    var half = '', pad_to_go;
-
-    var str_pad_repeater = function(s, len) {
-        var collect = '', i;
-
-        while (collect.length < len) {
-            collect += s;
-        }
-        collect = collect.substr(0, len);
-
-        return collect;
-    };
-
-    if (pad_type !== 'STR_PAD_LEFT' && pad_type !== 'STR_PAD_RIGHT' && pad_type !== 'STR_PAD_BOTH') {
-        pad_type = 'STR_PAD_RIGHT';
-    }
-    if ((pad_to_go = pad_length - input.length) > 0) {
-        if (pad_type === 'STR_PAD_LEFT') { input = str_pad_repeater(pad_string, pad_to_go) + input; }
-        else if (pad_type === 'STR_PAD_RIGHT') { input = input + str_pad_repeater(pad_string, pad_to_go); }
-        else if (pad_type === 'STR_PAD_BOTH') {
-            half = str_pad_repeater(pad_string, Math.ceil(pad_to_go/2));
-            input = half + input + half;
-            input = input.substr(0, pad_length);
-        }
-    }
-
-    return input;
-}
-
-function str_repeat(str, mul) {
-    for (var i = 0, ret = ''; i < mul; i++) {
-        ret += str;
-    }
-    return ret;
-}
-
-function is_integer() {
-    for (var i = 0; i < arguments.length; i++) if (typeof arguments[i] !== 'number'
-        || Math.ceil(arguments[i]) !== arguments[i]) {
-        return false;
-    }
-    return true;
-}
-
-function SudokuSolver(opts) {
-    if (!(this instanceof SudokuSolver)) {
-        return new SudokuSolver(opts);
-    }
-    var self = this;
-    if (opts === void 0) {
-        opts = {};
-    }
-    var defs = {node: $(), interactive: true, autovalidate: true, autosolve: true,
-        gncSpeed: 100, keyboard: true, mouse: true};
-    for (var i in opts) {
-        defs[i] = opts[i];
-    }
-
-    self.rootNode = defs.node;
-    self.timers = {selector: false, update: false, recsolver: false};
-
-    self.sources = {user: true, solver: true, gnc: true};
-
-    self.state = -1;
-    self.svg = false;
-    self.rendered = false;
-    self.touched = []; // cells that are changed but not processed yet
-    self.gr = [];
-    self.interactive = defs.interactive; // gui allows to interact
-    self.autovalidate = 'solve'; // automatic validation
-    self.autovalidate = defs.autovalidate; // automatic validation
-    self.autosolve = defs.autosolve; // automatic solving
-    self.g = {
-        /// manual
-        cell_h: 50, cell_w: 50, // cell size
-        sel_h: 20, sel_w: 20, // selector cell size
-        padding: 5.5, // padding inside canvas
-        /// automatic
-        canv_w: 0, canv_h: 0, // canvas size
-        sel_nh: 0, sel_nw: 0, // selector number of cell
-        sel_th: 0, sel_tw: 0 // selector size
-    };
-
-    self.m = []; // game map
-
-    self.h = 0; // box height
-    self.w = 0; // box width
-    self.s = 0; // sudoku size — this.h * this.w
-    self.errors = 0; // error count
-    self.total = 0; // total number of cells
-    self.filled = 0; // number of filled cells
-    self.ufilled = 0; // number of filled by user cells
-    self.boxes = false; // is boxes are used (there are no boxes if this.h or this.w is 1)
-    self.mx = 0; // main grid height
-    self.my = 0; // main grid width
-    self.houses = {}; // list of houses
-    self.symb = []; // sudoku symbols
-    self.symbtxt = false;
-    self.symbSize = 1; // maximum number of letters used in sudoku symbols
-    self.grids = []; // coordinates of grids
-
-    self.solver = {nakedSingles: []};
-
-    this.update_w = {};
-    this.aftersolve = [];
-    self.gnc = false;
-    self.gncSpeed = defs.gncSpeed;
-
-    self.kbdState = false;
-    this.kbd_ev = false;
-
-    if (self.interactive && defs.keyboard !== false) {
-        self.keyboard(true);
-    }
-
-}
-
-SudokuSolver.prototype = new EventEmitter;
-
-SudokuSolver.prototype.select_next = function () {
-    var x = this.mx + (this.acell ? this.acell.x : -1), y = this.my + (this.acell ? this.acell.y : -1), limit = this.mx * this.my;
-    do {
-        x += 1;
-        if (x % this.mx === 0) {
-            y += 1;
-        }
-        limit -= 1;
-    } while (limit && (!this.m[x % this.mx][y % this.my] || this.m[x % this.mx][y % this.my].digit));
-    if (limit === 0) {
-        this.select_cell(false);
-    } else {
-        this.select_cell(this.m[x % this.mx][y % this.my]);
-    }
-};
-
-SudokuSolver.prototype.keyboard = function (state) {
-    if (arguments.length === 0) {
-        return this.kbdState;
-    }
-    if (state === false && this.kbdState) {
-        // turn it off
-        $(document).unbind("." + this.kbd_ev);
-        this.kbdState = false;
-        if (this.rendered) {
-            $(this.gr.cells).removeClass("keyboard");
-        }
-    }
-    if (state === true && !this.kbdState) {
-        // turn it on
-        if (!this.interactive) {
-            /* TODO: error handling */
-            return this;
-        }
-        this.kbd_ev = '';
-        for (var i = 0; i < 8; i += 1) {
-            this.kbd_ev += String.fromCharCode('a'.charCodeAt(0) + Math.floor(Math.random()*26));
-        }
-        var t = this;
-        var step = function (v) {
-            var x = t.mx + (t.acell ? t.acell.x : -v), y = t.my + (t.acell ? t.acell.y : -v);
-            do {
-                x += v;
-                if (x % t.mx === (v < 0 ? t.mx - 1 : 0)) {
-                    x += t.mx;
-                    y += v;
-                }
-            } while (!t.m[x % t.mx][y % t.my]);
-            t.select_cell(t.m[x % t.mx][y % t.my], false);
-        };
-        var move = function (coord, v) {
-            if (!t.acell) {
-                step(1);
-                return;
-            }
-            var c = {x: t.mx + t.acell.x, y: t.my + t.acell.y};
-            c[coord] += v;
-            while (!t.m[c.x % t.mx][c.y % t.my]) {
-                c[coord] += v;
-            }
-            t.select_cell(t.m[c.x % t.mx][c.y % t.my], false);
-        };
-        $(document).bind("keydown." + this.kbd_ev, function (e) {
-            if (typeof e.target.form === "object" ||  // if target is form element
-                e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) {
-                return;
-            }
-            if (49 <= e.keyCode && e.keyCode <= 69) { // 1-9 a-
-                t.select(t.acell, e.keyCode - 48, 'user');
-            } else if (97 <= e.keyCode && e.keyCode <= 105) { // 1-9 keypad
-                t.select(t.acell, e.keyCode - 96, 'user');
-            } else if (e.keyCode === 8) { // backspace
-                step(-1);
-                t.cancel(t.acell, 'user');
-            } else if (e.keyCode === 46) { // delete
-                t.cancel(t.acell, 'user');
-                if (!t.acell.digit) {
-                    t.show_selector();
-                }
-            } else if (e.keyCode === 32) { // space
-                t.select_next();
-            } else if (e.keyCode === 37) { // left
-                move('x', -1);
-            } else if (e.keyCode === 38) { // up
-                move('y', -1);
-            } else if (e.keyCode === 39) { // right
-                move('x', 1);
-            } else if (e.keyCode === 40) { // down
-                move('y', 1);
-            } else {
-                console.log('down', e.keyCode, e);
-                return;
-            }
-            return false;
-        });
-        this.kbdState = true;
-        if (this.rendered) {
-            $(this.gr.cells).addClass("keyboard");
-        }
+      for (i = 0, _ref2 = dim[level]; i < _ref2; i += 1) {
+        this[i] = [].fill(dim, value, 1 + level);
+      }
     }
     return this;
-}
-
-SudokuSolver.prototype.export_solution = function () {
-    var e = "", x, y, cell, num = 0;
-    for (y = 0; y < this.my; y++) for (x = 0; x < this.mx; x++) if (cell = this.m[x][y]) {
-        if (cell.digit) {
-            e += str_repeat('.', num) + str_pad(this.symb[cell.digit], this.letters, "_", 'STR_PAD_LEFT');
-            num = 0;
-        } else {
-            num++;
+  };
+  Array.prototype.remove = function(index) {
+    var i, _ref, _ref2;
+    if (!((0 <= +index && +index <= this.length))) {
+      return this;
+    }
+    for (i = _ref = 1 + index, _ref2 = this.length; i < _ref2; i += 1) {
+      this[i - 1] = this[i];
+    }
+    this.pop();
+    return this;
+  };
+  Array.prototype.eliminate = function(value) {
+    var i;
+    i = 0;
+    while (i < this.length) {
+      if (this[i] === value) {
+        this.remove(i);
+      } else {
+        i += 1;
+      }
+    }
+    return this;
+  };
+  String.prototype.repeat = function(times) {
+    var i, ret;
+    ret = '';
+    if (times > 0) {
+      for (i = 0; i < times; i += 1) {
+        ret += this;
+      }
+    }
+    return ret;
+  };
+  String.prototype.pad = function(len, str, type) {
+    var half, input, repeater, togo;
+    half = '';
+    repeater = function(s, len) {
+      var collect;
+      collect = '';
+      while (collect.length < len) {
+        collect += s;
+      }
+      return collect = collect.substr(0, len);
+    };
+    if (type !== 'left' && type !== 'right' && type !== 'both') {
+      type = 'right';
+    }
+    togo = len - this.length;
+    if (togo > 0) {
+      return this;
+    } else if (type === 'left') {
+      return repeater(str, togo) + this;
+    } else if (type === 'right') {
+      return this + repeater(str, togo);
+    } else if (type === 'both') {
+      half = repeater(str, Math.ceil(togo / 2));
+      return input = (half + this + half).substr(0, len);
+    }
+  };
+  if (typeof process === "undefined" || process === null) {
+    process = {
+      nextTick: function(f) {
+        return setTimeout(f, 1);
+      }
+    };
+  }
+  DLList = (function() {
+    function DLList() {
+      this.head = this.tail = false;
+      this.length = 0;
+    }
+    DLList.prototype.add = function(elem) {
+      var wrp;
+      this.head = wrp = {
+        e: elem,
+        next: this.head,
+        prev: false
+      };
+      if (wrp.next) {
+        wrp.next.prev = wrp;
+      } else {
+        this.tail = wrp;
+      }
+      this.length += 1;
+      return wrp;
+    };
+    DLList.prototype.find = function(elem) {
+      var it;
+      it = this.head;
+      while (it) {
+        if (it.e === elem) {
+          break;
         }
-    }
-    return e;
-}
-
-SudokuSolver.prototype.export_all = function () {
-    var e = {map: "", data: "", solution: ""}, c = false;
-    if (this.h !== 3 || this.w !== 3) {
-        e.map += this.h + "x" + this.w + ",";
-        c = true;
-    }
-    if (this.grids.length !== 1) {
-        for (var i = 0; i < this.grids.length; i++) {
-            e.map += this.grids[i].pos.x + ";" + this.grids[i].pos.y + ",";
-            c = true;
+        it = it.next;
+      }
+      return it;
+    };
+    DLList.prototype.remove = function(wrp) {
+      if (wrp === this.head) {
+        this.head = wrp.next;
+      } else {
+        wrp.prev.next = wrp.next;
+      }
+      if (wrp === this.tail) {
+        this.tail = wrp.prev;
+      } else {
+        wrp.next.prev = wrp.prev;
+      }
+      this.length -= 1;
+      wrp.dead = true;
+      return this;
+    };
+    DLList.prototype.iter = function(f) {
+      var it, r;
+      it = this.head;
+      while (it) {
+        r = f(it.e);
+        if (r === false) {
+          break;
         }
+        it = it.next;
+      }
+      return this;
+    };
+    return DLList;
+  })();
+  DLSet = (function() {
+    __extends(DLSet, DLList);
+    function DLSet() {
+      DLSet.__super__.constructor.apply(this, arguments);
     }
-    for (var p in this.houses) switch (this.houses[p].type) {
-        case 3: e.map += "h=3;" + this.houses[p].grid + ","; break;
-        case 4: e.map += "h=4;" + this.houses[p].grid + ","; break;
-    }
-    if (this.symbtxt !== false) {
-        e.map += "symb=" + this.symbtxt + ",";
-    }
-
-    for (var y = 0, cell, num1 = 0, num2 = 0; y < this.my; y++) for (var x = 0; x < this.mx; x++) if (cell = this.m[x][y]) {
-        if (cell.digit && cell.source === 'user') {
-            e.data += str_repeat('.', num1) + str_pad(this.symb[cell.digit], this.letters, "_", 'STR_PAD_LEFT');
-            num1 = 0;
-        } else {
-            num1++;
-        }
-        if (cell.digit) {
-            e.solution += str_repeat('.', num2) + str_pad(this.symb[cell.digit], this.letters, "_", 'STR_PAD_LEFT');
-            num2 = 0;
-        } else {
-            num2++;
-        }
-    }
-    return e;
-}
-
-SudokuSolver.prototype.import_txt = function (data) {
-    if (typeof data !== "string") {
+    DLSet.prototype.add = function(elem) {
+      var wrp;
+      if (this[elem.id] != null) {
+        throw new Error('Duplicate element in set');
+      }
+      wrp = DLSet.__super__.add.call(this, elem);
+      return this[elem.id] = {
+        e: elem,
+        w: wrp
+      };
+    };
+    DLSet.prototype.remove = function(elem) {
+      var ref;
+      ref = typeof elem === 'string' ? this[elem] : typeof elem === 'object' && (elem.id != null) ? this[elem.id] : elem;
+      if (typeof ref !== 'object') {
         return false;
+      }
+      DLSet.__super__.remove.call(this, ref.w);
+      delete this[ref.e.id];
+      return ref;
+    };
+    return DLSet;
+  })();
+  _aa = function(n) {
+    var aa, p;
+    p = Math.floor(Math.log(26 + 25 * n) / Math.log(26));
+    aa = '';
+    n -= Math.floor((Math.pow(26, p) - 26) / 25);
+    while (p) {
+      aa = String.fromCharCode('A'.charCodeAt(0) + n % 26) + aa;
+      n = Math.floor(n / 26);
+      p -= 1;
     }
-    data = data.split(/\,/);
-    var map = {h: 3, w: 3, grids: [], houses: []}, i = 0, t, vars = {l: 1};
-    if (i < data.length && data[i].match(/^\d+x\d+$/)) {
+    return aa;
+  };
+  _aa2i = function(aa) {
+    var i, n, p, _ref;
+    n = (Math.pow(26, aa.length) - 26) / 25;
+    p = 1;
+    for (i = _ref = aa.length - 1; i >= 0; i += -1) {
+      n += (aa.charCodeAt(i) - 'A'.charCodeAt(0)) * p;
+      p *= 10;
+    }
+    return n;
+  };
+  SudokuRenderer = (function() {
+    __extends(SudokuRenderer, EventEmitter);
+    SudokuRenderer.prototype.id = 0;
+    function SudokuRenderer(opts) {
+      var defs, _ref;
+      if (!(this instanceof SudokuRenderer)) {
+        return new SudokuRenderer(opts);
+      }
+      defs = {
+        node: $(),
+        interactive: true,
+        axisLabels: true,
+        keyboard: false
+      };
+      extend(defs, opts);
+      this.id = "g" + SudokuRenderer.prototype.id;
+      SudokuRenderer.prototype.id += 1;
+      this.grid = (_ref = defs.grid) != null ? _ref : new SudokuGrid;
+      if (!(this.grid instanceof SudokuGrid)) {
+        throw new Error('Grid is not of class SudokuGrid');
+      }
+      this.g = {
+        cell_h: 50,
+        cell_w: 50,
+        sel_h: 20,
+        sel_w: 20,
+        padding: 5.5,
+        canv_w: 0,
+        canv_h: 0,
+        sel_nh: 0,
+        sel_nw: 0,
+        sel_th: 0,
+        sel_tw: 0
+      };
+      this.acell = this.agrid = false;
+      this.rootNode = defs.node;
+      this.svg = false;
+      this.needrender = false;
+      this.rendered = false;
+      this._axisLabels = !!defs.axisLabels;
+      this._kbd = false;
+      this.rootNode.svg({
+        onLoad: __bind(function(svg) {
+          this.svg = svg;
+          if (this.needrender) {
+            return this.render();
+          }
+        }, this)
+      });
+      this.interactive = !!defs.interactive;
+      this.timers = {
+        selector: false,
+        update: false
+      };
+      if (this.grid.headCell) {
+        this.render();
+      }
+      if (defs.keyboard) {
+        this.keyboardOn();
+      }
+      this.grid.on('loadMap', __bind(function() {
+        this.selectGrid(0);
+        return this.render();
+      }, this));
+      this.grid.on('unloadMap', __bind(function() {
+        return this.rendered = this.needrender = this.acell = this.agrid = false;
+      }, this));
+      this.grid.on('loadSymb', __bind(function() {
+        return this._loadSymb();
+      }, this));
+      this.grid.on('set', __bind(function(cell) {
+        return this._set(cell);
+      }, this));
+      this.grid.on('unset', __bind(function(cell) {
+        return this._unset(cell);
+      }, this));
+      this.grid.on('cellChsrc', __bind(function(cell, old) {
+        return this._cellChsrc(cell, old);
+      }, this));
+      this.grid.on('addHouse', __bind(function(house) {
+        return this._addHouse(house);
+      }, this));
+      this.grid.on('delHouse', __bind(function(house) {
+        return this._delHouse(house);
+      }, this));
+      this.grid.on('touch', __bind(function(cell) {
+        return this._touch(cell);
+      }, this));
+      this.grid.on('error', __bind(function(cell) {
+        return this._error(cell);
+      }, this));
+      this.grid.on('fix', __bind(function(cell) {
+        return this._fix(cell);
+      }, this));
+      this.grid.on('mark', __bind(function(cells) {
+        var cell, _i, _len, _results;
+        _results = [];
+        for (_i = 0, _len = cells.length; _i < _len; _i++) {
+          cell = cells[_i];
+          _results.push(this.showCandidates(cell));
+        }
+        return _results;
+      }, this));
+      this.grid.on('unmark', __bind(function(cells) {
+        var cell, _i, _len, _results;
+        _results = [];
+        for (_i = 0, _len = cells.length; _i < _len; _i++) {
+          cell = cells[_i];
+          _results.push(this.showCandidates(cell));
+        }
+        return _results;
+      }, this));
+      this.grid.on('markHouse', __bind(function(house, n) {
+        return this._markHouse(house, n);
+      }, this));
+      this.grid.on('unmarkHouse', __bind(function(house) {
+        return this._unmarkHouse(house);
+      }, this));
+    }
+    SudokuRenderer.prototype._markHouse = function(house, n) {
+      var cell, _i, _len;
+      for (_i = 0, _len = house.length; _i < _len; _i++) {
+        cell = house[_i];
+        $(cell[this.id].node).children("rect").addClass("light" + n);
+      }
+    };
+    SudokuRenderer.prototype._unmarkHouse = function(house) {
+      var cell, _i, _len;
+      for (_i = 0, _len = house.length; _i < _len; _i++) {
+        cell = house[_i];
+        $(cell[this.id].node).children("rect").removeClass("light1 light2 light3 light4");
+      }
+    };
+    SudokuRenderer.prototype.hideCandidates = function(cell) {
+      var cg;
+      cg = cell[this.id];
+      if (cg.candgridNode == null) {
+        return;
+      }
+      this.svg.remove($(cg.candgridNode));
+      return cg.candgridNode = null;
+    };
+    SudokuRenderer.prototype.showCandidates = function(cell) {
+      var cg, d, i, j, startx, starty, stepx, stepy, x, y, _ref, _ref2, _ref3;
+      if (cell.digit) {
+        return;
+      }
+      cg = cell[this.id];
+      if (cg.candgridNode != null) {
+        this.svg.remove($(cg.candgridNode));
+      }
+      cg.candgridNode = this.svg.group(cg.node, {
+        class_: 'candgrid'
+      });
+      stepx = this.g.cell_w / this.g.sel_nw;
+      startx = cg.x + stepx / 2;
+      stepy = this.g.cell_h / this.g.sel_nh;
+      starty = cg.y + 4 + stepy / 2;
+      for (j = 0, _ref = this.g.sel_nw; j < _ref; j += 1) {
+        for (i = 0, _ref2 = this.g.sel_nw; i < _ref2; i += 1) {
+          d = 1 + j * this.g.sel_nw + i;
+          if (!cell.cand[d] && !cell.mask[d]) {
+            x = startx + i * stepx;
+            y = starty + j * stepy;
+            if (((_ref3 = cell.colors) != null ? _ref3[d] : void 0) != null) {
+              this.svg.circle(cg.candgridNode, x, y - 3, 6, {
+                fill: cell.colors[d],
+                opacity: 0.4
+              });
+            }
+            this.svg.text(cg.candgridNode, x, y, this.grid.symb[d], {
+              class_: 'cand'
+            });
+          }
+        }
+      }
+    };
+    SudokuRenderer.prototype._touch = function(cell) {
+      var _ref;
+      if (cell.digit) {
+        return;
+      }
+      if ((1 <= (_ref = cell.rcand.length) && _ref <= 4) || (cell.colors != null)) {
+        return this.showCandidates(cell);
+      } else {
+        return this.hideCandidates(cell);
+      }
+    };
+    SudokuRenderer.prototype._error = function(cell) {
+      if (!this.rendered) {
+        return;
+      }
+      return $(cell[this.id].node).addClass('error');
+    };
+    SudokuRenderer.prototype._fix = function(cell) {
+      if (!this.rendered) {
+        return;
+      }
+      return $(cell[this.id].node).removeClass('error');
+    };
+    SudokuRenderer.prototype.keyboardOff = function() {
+      if (!this._kbd) {
+        return this;
+      }
+      $(document).unbind("keydown.SudokuRenderer_" + this.id);
+      this._kbd = false;
+      if (this.rendered) {
+        $(this.gr.cells).removeClass('keyboard');
+      }
+      return this;
+    };
+    SudokuRenderer.prototype.keyboardOn = function() {
+      if (this._kbd) {
+        return this;
+      }
+      if (!this.interactive) {
+        throw new Error('Sudoku not interactive');
+      }
+      console.log('enabling keyboard', document);
+      $(document).bind("keydown.SudokuRenderer_" + this.id, __bind(function(e) {
+        var _ref, _ref2;
+        if (!this.rendered) {
+          return;
+        }
+        if (typeof e.target.form === 'object' || e.altKey || e.shiftKey) {
+          return;
+        }
+        if (e.ctrlKey && e.keyCode === 90) {
+          this.grid.undo();
+        }
+        if (e.ctrlKey || e.metaKey) {
+          return;
+        }
+        if (!this.acell) {
+          this.selectCell(this.grid.headCell);
+        }
+        if ((49 <= (_ref = e.keyCode) && _ref <= 69)) {
+          if (this.acell.digit) {
+            this.acell.unset(this.acell.source);
+          }
+          try {
+            this.acell.set(e.keyCode - 48, 'user');
+          } catch (e) {
+
+          }
+        } else if ((97 <= (_ref2 = e.keyCode) && _ref2 <= 105)) {
+          if (this.acell.digit) {
+            this.acell.unset(this.acell.source);
+          }
+          try {
+            this.acell.set(e.keyCode - 96, 'user');
+          } catch (e) {
+
+          }
+        } else if (e.keyCode === 8) {
+          this.selectCell(this.acell.prev || this.grid.tailCell);
+          if (this.acell.digit) {
+            this.acell.unset(this.acell.source);
+          }
+        } else if (e.keyCode === 46) {
+          if (this.acell.digit) {
+            this.acell.unset(this.acell.source);
+          }
+        } else if (e.keyCode === 37) {
+          this.selectCell(this.acell.left);
+        } else if (e.keyCode === 38) {
+          this.selectCell(this.acell.top);
+        } else if (e.keyCode === 39) {
+          this.selectCell(this.acell.right);
+        } else if (e.keyCode === 40) {
+          this.selectCell(this.acell.bottom);
+        } else {
+          if (window.pkc) {
+            console.log('down', e.keyCode, e);
+          }
+          return;
+        }
+        return false;
+      }, this));
+      this._kbd = true;
+      if (this.rendered) {
+        $(this.gr.cells).addClass('keyboard');
+      }
+      return this;
+    };
+    SudokuRenderer.prototype._loadSymb = function() {
+      var cell, i, _ref, _results;
+      if (!this.rendered) {
+        return;
+      }
+      cell = this.grid.headCell;
+      while (cell) {
+        if (cell.digit) {
+          $('text', cell[this.id].node).text(this.grid.symb[cell.digit]);
+        }
+        cell = cell.next;
+      }
+      if (this.interactive) {
+        _results = [];
+        for (i = 1, _ref = this.s; i <= _ref; i += 1) {
+          _results.push($('text', this.gr.selector.childNodes[i]).text(this.grid.symb[i]));
+        }
+        return _results;
+      }
+    };
+    SudokuRenderer.prototype._set = function(cell) {
+      var cg;
+      if (!this.rendered) {
+        return;
+      }
+      cg = cell[this.id];
+      this.hideCandidates(cell);
+      return this.svg.text(cg.node, cg.x + this.g.tx, cg.y + this.g.ty, this.grid.symb[cell.digit], {
+        class_: cell.source
+      });
+    };
+    SudokuRenderer.prototype._unset = function(cell) {
+      if (!this.rendered) {
+        return;
+      }
+      return this.svg.remove($('text', cell[this.id].node));
+    };
+    SudokuRenderer.prototype._cellChsrc = function(cell, old) {
+      if (!this.rendered) {
+        return;
+      }
+      return $('text', cell[this.id].node).removeClass(old).addClass(cell.source);
+    };
+    SudokuRenderer.prototype._addHouse = function(house) {
+      var cell, cg, gnode, tnode, _i, _len, _ref, _ref2, _results;
+      if (!this.rendered) {
+        return;
+      }
+      if ((_ref = house.type) === 'diag1' || _ref === 'diag2') {
+        _results = [];
+        for (_i = 0, _len = house.length; _i < _len; _i++) {
+          cell = house[_i];
+          cg = cell[this.id];
+          if (((_ref2 = cell.houses[house.type]) != null ? _ref2.length : void 0) !== 1) {
+            continue;
+          }
+          this.svg.use(cg.node, '#' + house.type, {
+            transform: "translate(" + cg.x + ", " + cg.y + ")",
+            class_: house.type
+          });
+          tnode = $(cg.node).children('text');
+          gnode = $(cg.node).children('g');
+          if (tnode.length) {
+            this.svg.add(cg.node, tnode);
+            this.svg.remove(tnode);
+          }
+          _results.push(gnode.length ? (this.svg.add(cg.node, gnode), this.svg.remove(gnode)) : void 0);
+        }
+        return _results;
+      }
+    };
+    SudokuRenderer.prototype._delHouse = function(house) {
+      var cell, _i, _len, _ref, _ref2, _results;
+      if (!this.rendered) {
+        return;
+      }
+      if ((_ref = house.type) === 'diag1' || _ref === 'diag2') {
+        _results = [];
+        for (_i = 0, _len = house.length; _i < _len; _i++) {
+          cell = house[_i];
+          if (((_ref2 = cell.houses[house.type]) != null ? _ref2.length : void 0) !== 0) {
+            continue;
+          }
+          _results.push(this.svg.remove($("use." + house.type, cell[this.id].node)));
+        }
+        return _results;
+      }
+    };
+    SudokuRenderer.prototype._cellClick = function(e, cell) {
+      if (e.ctrlKey || e.altKey || e.shiftKey || e.metaKey) {
+        return;
+      }
+      if (cell.digit && cell.source !== 'user') {
+        return cell.setUser();
+      } else if (cell.digit) {
+        return cell.unset('user');
+      } else {
+        this.selectCell(cell);
+        return this.showSelector();
+      }
+    };
+    SudokuRenderer.prototype.selectCell = function(cell) {
+      var cg, oldcell, _ref;
+      if (!this.grid.isCell(cell)) {
+        throw new Error('No such cell');
+      }
+      _ref = [this.acell, cell], oldcell = _ref[0], this.acell = _ref[1];
+      if (!this.rendered) {
+        return this;
+      }
+      if (oldcell !== false) {
+        $(oldcell[this.id].node).removeClass('active');
+      }
+      if (this.acell) {
+        cg = this.acell[this.id];
+        $(cg.node).addClass('active');
+      }
+      return this;
+    };
+    SudokuRenderer.prototype._selectorClick = function(e, k) {
+      if (!e.shiftKey && (this.acell.cand[k] || this.acell.mask[k])) {
+        return;
+      }
+      this.hideSelector(true);
+      return this.acell.set(k, 'user', e.shiftKey);
+    };
+    SudokuRenderer.prototype._pos = function(i, j) {
+      var _ref;
+      if (!(j != null)) {
+        _ref = [i.i, i.j], i = _ref[0], j = _ref[1];
+      }
+      return {
+        x: this.g.padding + this.g.cell_w * (j + 1),
+        y: this.g.padding + this.g.cell_h * (i + 1)
+      };
+    };
+    SudokuRenderer.prototype._center = function(i, j) {
+      var _ref;
+      if (!(j != null)) {
+        _ref = [i.i, i.j], i = _ref[0], j = _ref[1];
+      }
+      return {
+        x: this.g.padding + this.g.cell_w * (j + 1.5),
+        y: this.g.padding + this.g.cell_h * (i + 1.5)
+      };
+    };
+    SudokuRenderer.prototype.showSelector = function() {
+      var acg, k, nx, ny, _ref;
+      if (!(this.interactive && this.rendered)) {
+        throw new Error('Grid is not interactive or not rendered');
+      }
+      if (!this.acell) {
+        throw new Error('No cell selected');
+      }
+      if (this.timers.selector) {
+        clearTimeout(this.timers.selector);
+        this.timers.selector = false;
+      }
+      for (k = 0, _ref = this.grid.s; k < _ref; k += 1) {
+        if (this.acell.cand[1 + k] || this.acell.mask[1 + k]) {
+          $(this.gr.selector.childNodes[k]).addClass('disabled');
+        } else {
+          $(this.gr.selector.childNodes[k]).removeClass('disabled');
+        }
+      }
+      acg = this.acell[this.id];
+      nx = acg.x + 0.5 * (this.g.cell_w - this.g.sel_tw);
+      ny = acg.y + 0.5 * (this.g.cell_h - this.g.sel_th);
+      if (nx + this.g.sel_tw > this.g.canv_w) {
+        nx = this.g.canv_w - this.g.sel_tw;
+      }
+      if (ny + this.g.sel_th > this.g.canv_h) {
+        ny = this.g.canv_h - this.g.sel_th;
+      }
+      if (nx < 0) {
+        nx = 0;
+      }
+      if (ny < 0) {
+        ny = 0;
+      }
+      $(this.gr.selector).attr('transform', "translate(" + nx + "," + ny + ")").show();
+      this.gr.selector.scrollIntoViewIfNeeded();
+      return this;
+    };
+    SudokuRenderer.prototype.hideSelector = function(now) {
+      if (now) {
+        if (this.timers.selector) {
+          clearTimeout(this.timers.selector);
+          this.timers.selector = false;
+        }
+        $(this.gr.selector).hide();
+        return this;
+      }
+      if (this.timers.selector) {
+        return this;
+      }
+      return this.timers.selector = setTimeout((__bind(function() {
+        $(this.gr.selector).hide();
+        return this.timers.selector = false;
+      }, this)), 1000);
+    };
+    SudokuRenderer.prototype.render = function() {
+      var boxId, cell, cg, d, g, gr, grid, i, j, k, n, options, p, q, stime, svg, svgdefs, x, y, z, _len, _ref, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7;
+      if (!this.svg) {
+        this.needrender = true;
+        return this;
+      }
+      this.needrender = false;
+      stime = (new Date()).getTime();
+      svg = this.svg;
+      g = this.g;
+      g.canv_w = (this.grid.mj + 1) * g.cell_w + 2 * g.padding;
+      g.canv_h = (this.grid.mi + 1) * g.cell_h + 2 * g.padding;
+      g.tx = g.cell_w / 2;
+      g.ty = g.cell_h / 2 + 7;
+      svg.clear(true);
+      svg.configure({
+        width: g.canv_w,
+        height: g.canv_h
+      }, true);
+      svg.style("@-webkit-keyframes 'appear' {\n    from {\n        opacity: 0;\n    }\n    to {\n        opacity: 1;\n    }\n}\n\n#cells rect { fill: #fff; stroke: #000; stroke-width: 0.2; }\n#cells rect.light1 { fill: #ddddff; }\n#cells rect.light2 { fill: #ddffdd; }\n#cells rect.light1.light2 { fill: #ddffff; }\n#cells rect.light3 { fill: #ffdddd; }\n#cells rect.light1.light3 { fill: #ffddff; }\n#cells rect.light2.light3 { fill: #ffffdd; }\n#cells.keyboard g.active rect { fill: #ccc; }\n#cells g.error rect { fill: #f45252; }\n#cells g.error.active rect { fill: #f42222; }\n#cells text { fill: #666; cursor: default; text-anchor: middle; }\n#cells text.user { fill: #000; }\n#cells text.solver { fill: #039; -webkit-animation: 'appear' 1s; }\n#cells text.gnc { fill: #080; -webkit-animation: 'appear' 0.2s; }\n#cells text.cand { fill: #222; cursor: default; text-anchor: middle; font-family: serif; font-size: 10px; }\n\n#selector { opacity: 0.7; }\n#selector:hover { opacity: 0.9; }\n#selector rect { fill: #fff; stroke: #000; stroke-width: 0.2; stroke-linecap: round; }\n#selector g:hover rect { fill: #f3f3f3; }\n#selector text { fill: #000; font-size: 12px; text-anchor: middle; cursor: default; }\n#selector g.disabled rect { fill: #fff; }\n#selector g.disabled text { fill: #ccc; }\n\n#grid_id { opacity: 0.9; fill: #000; stroke: #fff; stroke-width: 2; text-anchor: middle; cursor: default; }\n#grid_id text.active { fill: #e00; }\n#grid_id text:hover { stroke: #66e; }\n");
+      svgdefs = svg.defs();
+      d = svg.group(svgdefs, {
+        id: 'diag1',
+        fill: '#ccc'
+      });
+      svg.circle(d, 0.2 * g.cell_w, 0.2 * g.cell_h, 0.1 * g.cell_w);
+      svg.circle(d, 0.5 * g.cell_w, 0.5 * g.cell_h, 0.1 * g.cell_w);
+      svg.circle(d, 0.8 * g.cell_w, 0.8 * g.cell_h, 0.1 * g.cell_w);
+      d = svg.group(svgdefs, {
+        id: 'diag2',
+        fill: '#ccc'
+      });
+      svg.circle(d, 0.8 * g.cell_w, 0.2 * g.cell_h, 0.1 * g.cell_w);
+      svg.circle(d, 0.5 * g.cell_w, 0.5 * g.cell_h, 0.1 * g.cell_w);
+      svg.circle(d, 0.2 * g.cell_w, 0.8 * g.cell_h, 0.1 * g.cell_w);
+      gr = this.gr = {};
+      if (this._axisLabels) {
+        gr.coords = svg.group({
+          fill: '#888',
+          'font-size': "" + (0.33 * g.cell_h) + "px",
+          cursor: 'default',
+          'text-anchor': 'middle'
+        });
+        for (j = 0, _ref = this.grid.mj; j < _ref; j += 1) {
+          svg.text(gr.coords, this._center(0, j).x, g.padding + g.cell_h - 8, "" + (j + 1));
+        }
+        for (i = 0, _ref2 = this.grid.mi; i < _ref2; i += 1) {
+          svg.text(gr.coords, g.padding + g.cell_w - 10, this._center(i, 0).y + 5, _aa(i));
+        }
+      }
+      gr.cells = svg.group({
+        id: 'cells',
+        'font-size': "" + (0.7 * g.cell_h) + "px",
+        class_: this._kbd ? 'keyboard' : ''
+      });
+      cell = this.grid.headCell;
+      while (cell) {
+        p = this._pos(cell);
+        cg = cell[this.id] = {
+          node: svg.group(gr.cells),
+          x: p.x,
+          y: p.y,
+          cand: false
+        };
+        svg.rect(cg.node, p.x, p.y, g.cell_w, g.cell_h);
+        $(cg.node).bind('click', __bind(function(cell) {
+          return __bind(function(e) {
+            if (this.interactive) {
+              return this._cellClick(e, cell);
+            }
+          }, this);
+        }, this)(cell));
+        if (cell.err) {
+          $(cg.node).addClass('error');
+        }
+        if (cell === this.acell) {
+          $(cg.node).addClass('active');
+        }
+        if ((_ref3 = cell.houses.diag1) != null ? _ref3.length : void 0) {
+          svg.use(cg.node, '#diag1', {
+            transform: "translate(" + cg.x + ", " + cg.y + ")",
+            class_: 'diag1'
+          });
+        }
+        if ((_ref4 = cell.houses.diag2) != null ? _ref4.length : void 0) {
+          svg.use(cg.node, '#diag2', {
+            transform: "translate(" + cg.x + ", " + cg.y + ")",
+            class_: 'diag2'
+          });
+        }
+        if (cell.digit) {
+          svg.text(cg.node, cg.x + g.tx, cg.y + g.ty, this.grid.symb[cell.digit], {
+            class_: cell.source
+          });
+        }
+        cell = cell.next;
+      }
+      gr.hborder = svg.group({
+        stroke: '#888',
+        'stroke-width': '2.5',
+        'stroke-linecap': 'round'
+      });
+      gr.mborder = svg.group({
+        stroke: '#000',
+        'stroke-width': '2.5',
+        'stroke-linecap': 'round'
+      });
+      cell = this.grid.headCell;
+      while (cell) {
+        i = cell.i;
+        j = cell.j;
+        p = cell[this.id];
+        q = this._pos(i + 1, j + 1);
+        if (this.grid.boxes) {
+          boxId = cell.houses.box.head.e.id;
+          if (cell.left.j + 1 === cell.j && boxId !== cell.left.houses.box.head.e.id) {
+            svg.path(gr.hborder, "M" + p.x + "," + p.y + "L" + p.x + "," + q.y);
+          }
+          if (cell.top.i + 1 === cell.i && boxId !== cell.top.houses.box.head.e.id) {
+            svg.path(gr.hborder, "M" + p.x + "," + p.y + "L" + q.x + "," + p.y);
+          }
+        }
+        if (cell.left.j + 1 !== cell.j) {
+          svg.path(gr.mborder, "M" + p.x + "," + p.y + "L" + p.x + "," + q.y);
+        }
+        if (cell.top.i + 1 !== cell.i) {
+          svg.path(gr.mborder, "M" + p.x + "," + p.y + "L" + q.x + "," + p.y);
+        }
+        if (cell.bottom.i - 1 !== cell.i) {
+          svg.path(gr.mborder, "M" + p.x + "," + q.y + "L" + q.x + "," + q.y);
+        }
+        if (cell.right.j - 1 !== cell.j) {
+          svg.path(gr.mborder, "M" + q.x + "," + p.y + "L" + q.x + "," + q.y);
+        }
+        cell = cell.next;
+      }
+      gr.grid_id = svg.group({
+        id: 'grid_id',
+        'font-size': "" + (0.8 * this.grid.s * g.cell_h) + "px"
+      });
+      _ref5 = this.grid.grids;
+      for (z = 0, _len = _ref5.length; z < _len; z++) {
+        grid = _ref5[z];
+        x = grid.pos[this.id].x + 0.5 * this.grid.s * g.cell_w;
+        y = grid.pos[this.id].y + 0.7 * this.grid.s * g.cell_h;
+        options = grid === this.grid.agrid ? {
+          class_: 'active'
+        } : {};
+        grid.id_node = svg.text(gr.grid_id, x, y, "" + (z + 1), options);
+        $(grid.id_node).click(__bind(function(z) {
+          return __bind(function() {
+            return this.selectGrid(z);
+          }, this);
+        }, this)(z));
+      }
+      $(gr.grid_id).hide();
+      if (this.interactive) {
+        gr.selector = svg.group({
+          id: 'selector'
+        });
+        g.sel_nw = Math.ceil(Math.sqrt(this.grid.s));
+        g.sel_nh = Math.floor(Math.sqrt(this.grid.s));
+        g.sel_tw = g.sel_nw * g.sel_w;
+        g.sel_th = g.sel_nh * g.sel_h;
+        k = 1;
+        for (j = 0, _ref6 = g.sel_nh; j < _ref6; j += 1) {
+          for (i = 0, _ref7 = g.sel_nw; i < _ref7; i += 1) {
+            n = svg.group(gr.selector);
+            svg.rect(n, i * g.sel_w, j * g.sel_h, g.sel_w, g.sel_h);
+            if (k > this.grid.s) {
+              continue;
+            }
+            svg.text(n, g.sel_w * (i + 0.5), g.sel_h * (j + 0.7), this.grid.symb[k]);
+            $(n).bind('click', __bind(function(k) {
+              return __bind(function(e) {
+                return this._selectorClick(e, k);
+              }, this);
+            }, this)(k));
+            k += 1;
+          }
+        }
+        svg.path(gr.selector, "M0,0L0," + g.sel_th + "L" + g.sel_tw + "," + g.sel_th + "L" + g.sel_tw + ",0L0,0", {
+          fill: 'none',
+          stroke: '#888',
+          'stroke-width': '1.5'
+        });
+        $(gr.selector).bind('mouseover', __bind(function() {
+          if (this.timers.selector) {
+            clearTimeout(this.timers.selector);
+            return this.timers.selector = false;
+          }
+        }, this)).bind('mouseout', __bind(function() {
+          return this.hideSelector();
+        }, this)).hide();
+      }
+      this.rendered = true;
+      if (window.console != null) {
+        console.log("rendered in: " + ((new Date()).getTime() - stime));
+      }
+      return this;
+    };
+    SudokuRenderer.prototype.showGridId = function() {
+      if (this.rendered) {
+        return $(this.gr.grid_id).show();
+      }
+    };
+    SudokuRenderer.prototype.hideGridId = function() {
+      if (this.rendered) {
+        return $(this.gr.grid_id).hide();
+      }
+    };
+    SudokuRenderer.prototype.selectGrid = function(grid) {
+      if (this.agrid && this.rendered) {
+        $(this.agrid.id_node).removeClass('active');
+      }
+      this.agrid = false;
+      if (typeof grid === 'number' || typeof grid === 'string') {
+        if (this.grid.grids[+grid] != null) {
+          this.agrid = this.grid.grids[+grid];
+        }
+      } else if (typeof grid === 'object' && (this.grid.grids[grid.id] != null)) {
+        this.agrid = this.grid.grids[grid.id];
+      }
+      if (this.agrid && this.rendered) {
+        $(this.agrid.id_node).addClass('active');
+      }
+      this.emit('selectGrid');
+      return this;
+    };
+    return SudokuRenderer;
+  })();
+  this.SudokuRenderer = SudokuRenderer;
+  NakedSingles = (function() {
+    function NakedSingles(solver) {
+      this.solver = solver;
+      this.grid = this.solver.grid;
+      this.cand = [];
+      this.found = [];
+      this.enabled = true;
+      this.sbs = true;
+      this.touchCB = __bind(function(cell) {
+        if (cell.digit) {
+          return;
+        }
+        if (this.enabled && cell.rcand.length === 1) {
+          return this.cand.push(cell);
+        }
+      }, this);
+      if (this.enabled) {
+        this.grid.on('touch', this.touchCB);
+      }
+    }
+    NakedSingles.prototype.enable = function() {
+      if (this.enabled) {
+        return;
+      }
+      this.enabled = true;
+      return this.grid.on('touch', this.touchCB);
+    };
+    NakedSingles.prototype.disable = function() {
+      if (!this.enabled) {
+        return;
+      }
+      this.enabled = false;
+      return this.grid.removeListener('touch', this.touchCB);
+    };
+    NakedSingles.prototype.set = function() {
+      var cand, cell, result, _i, _len;
+      cand = this.cand;
+      this.cand = [];
+      result = false;
+      for (_i = 0, _len = cand.length; _i < _len; _i++) {
+        cell = cand[_i];
+        if (cell.rcand.length === 1) {
+          try {
+            cell.set(cell.rcand[0], 'solver');
+            result = true;
+          } catch (_e) {}
+        }
+      }
+      return result;
+    };
+    NakedSingles.prototype.search = function() {
+      var cand, cell, cellList, one, text, _i, _len;
+      if (this.found.length) {
+        throw new Error('New search while old results are not used!');
+      }
+      cellList = [];
+      cand = this.cand;
+      this.cand = [];
+      for (_i = 0, _len = cand.length; _i < _len; _i++) {
+        cell = cand[_i];
+        if ((cell.rcand != null) && cell.rcand.length === 1 && !cell.digit && !cell.cand[cell.rcand[0]] && !cell.mask[cell.rcand[0]]) {
+          this.found.push([cell, cell.rcand[0]]);
+          this.grid.mark([cell], [cell.rcand[0]], 'green');
+          cellList.push("<span class=\"cellRef\">" + cell.id + "</span>");
+        }
+      }
+      if (this.found.length) {
+        one = cellList.length === 1;
+        text = "Cell" + (one ? '' : 's') + " " + (cellList.join(', ')) + " ha" + (one ? 's' : 've') + " only one candidate remaining.";
+        this.msgid = this.grid.message(text);
+        return true;
+      }
+      return false;
+    };
+    NakedSingles.prototype.apply = function() {
+      var cell, found, k, _i, _len, _ref;
+      this.grid.removeMarks();
+      this.grid.removeMessage(this.msgid);
+      found = this.found;
+      this.found = [];
+      for (_i = 0, _len = found.length; _i < _len; _i++) {
+        _ref = found[_i], cell = _ref[0], k = _ref[1];
+        if (cell.rcand.length === 1) {
+          try {
+            cell.set(k, 'solver');
+          } catch (_e) {}
+        }
+      }
+    };
+    NakedSingles.prototype.discard = function() {
+      var cell, found, _i, _len;
+      this.grid.removeMarks();
+      this.grid.removeMessage(this.msgid);
+      found = this.found;
+      this.found = [];
+      for (_i = 0, _len = found.length; _i < _len; _i++) {
+        cell = found[_i];
+        this.cand.push(cell);
+      }
+    };
+    return NakedSingles;
+  })();
+  HiddenSingles = (function() {
+    function HiddenSingles(solver) {
+      this.solver = solver;
+      this.grid = this.solver.grid;
+      this.cand = [];
+      this.found = null;
+      this.enabled = true;
+      this.sbs = true;
+    }
+    HiddenSingles.prototype.enable = function() {
+      return this.enabled = true;
+    };
+    HiddenSingles.prototype.disable = function() {
+      return this.enabled = false;
+    };
+    HiddenSingles.prototype.findall = function() {
+      var cand, s;
+      s = this.grid.s;
+      cand = this.cand;
+      return this.grid.houses.iter(function(house) {
+        var cell, count, empty, k, last, _i, _len;
+        empty = (function() {
+          var _i, _len, _results;
+          _results = [];
+          for (_i = 0, _len = house.length; _i < _len; _i++) {
+            cell = house[_i];
+            if (!cell.digit) {
+              _results.push(cell);
+            }
+          }
+          return _results;
+        })();
+        for (k = 1; 1 <= s ? k <= s : k >= s; 1 <= s ? k++ : k--) {
+          count = 0;
+          last = false;
+          for (_i = 0, _len = empty.length; _i < _len; _i++) {
+            cell = empty[_i];
+            if (!(cell.cand[k] || cell.mask[k])) {
+              count += 1;
+              last = cell;
+            }
+          }
+          if (count === 1) {
+            cand.push([last, k, house]);
+          }
+        }
+      });
+    };
+    HiddenSingles.prototype.set = function() {
+      var cand, cell, k, result, _i, _len, _ref;
+      this.cand = [];
+      this.findall();
+      cand = this.cand;
+      result = false;
+      for (_i = 0, _len = cand.length; _i < _len; _i++) {
+        _ref = cand[_i], cell = _ref[0], k = _ref[1];
+        try {
+          cell.set(k, 'solver');
+          result = true;
+        } catch (_e) {}
+      }
+      return result;
+    };
+    HiddenSingles.prototype.search = function() {
+      var cell, house, k, text, _ref;
+      if (this.found != null) {
+        throw new Error('New search while old results are not used!');
+      }
+      this.cand = [];
+      this.findall();
+      if (!this.cand.length) {
+        return false;
+      }
+      this.found = this.cand[0];
+      _ref = this.found, cell = _ref[0], k = _ref[1], house = _ref[2];
+      this.grid.mark([cell], [k], 'green');
+      this.grid.markHouse(house);
+      text = "The only one candidate " + k + " remaining in " + house.type + "-" + house.s;
+      this.msgid = this.grid.message(text);
+      return true;
+    };
+    HiddenSingles.prototype.apply = function() {
+      var cell, k, _ref;
+      this.grid.removeMarks();
+      this.grid.removeHouseMarks();
+      this.grid.removeMessage(this.msgid);
+      _ref = this.found, cell = _ref[0], k = _ref[1];
+      this.found = null;
+      try {
+        cell.set(k, 'solver');
+      } catch (_e) {}
+    };
+    HiddenSingles.prototype.discard = function() {
+      this.grid.removeMarks();
+      this.grid.removeHouseMarks();
+      this.grid.removeMessage(this.msgid);
+      this.found = null;
+      this.cand = [];
+    };
+    return HiddenSingles;
+  })();
+  NakedSubsets = (function() {
+    function NakedSubsets(solver) {
+      this.solver = solver;
+      this.grid = this.solver.grid;
+      this.found = null;
+      this.enabled = true;
+      this.sbs = true;
+    }
+    NakedSubsets.prototype.enable = function() {
+      return this.enabled = true;
+    };
+    NakedSubsets.prototype.disable = function() {
+      return this.enabled = false;
+    };
+    NakedSubsets.prototype.commonHouses = function(cells) {
+      var cell, obj, t, _, _i, _len, _results;
+      t = {};
+      for (_i = 0, _len = cells.length; _i < _len; _i++) {
+        cell = cells[_i];
+        cell.houses.iter(function(house) {
+          if (t[house.id] != null) {
+            return t[house.id][0] += 1;
+          } else {
+            return t[house.id] = [1, house];
+          }
+        });
+      }
+      _results = [];
+      for (_ in t) {
+        obj = t[_];
+        if (obj[0] === cells.length) {
+          _results.push(obj[1]);
+        }
+      }
+      return _results;
+    };
+    NakedSubsets.prototype._isNakedSubset = function(a) {
+      var cand, cell, k, _i, _j, _len, _len2, _ref;
+      cand = [];
+      for (_i = 0, _len = a.length; _i < _len; _i++) {
+        cell = a[_i];
+        _ref = cell.rcand;
+        for (_j = 0, _len2 = _ref.length; _j < _len2; _j++) {
+          k = _ref[_j];
+          if (__indexOf.call(cand, k) < 0) {
+            cand.push(k);
+          }
+        }
+      }
+      if (cand.length === a.length) {
+        return {
+          digits: cand,
+          cells: a
+        };
+      }
+      return null;
+    };
+    NakedSubsets.prototype.findNakedSubsets = function() {
+      var isNS, ns, s;
+      ns = [];
+      isNS = this._isNakedSubset;
+      s = this.grid.s;
+      this.grid.houses.iter(function(house) {
+        var cell, i, j, k, prob, r, t, _ref, _ref10, _ref11, _ref12, _ref13, _ref14, _ref15, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9;
+        if (s - house.filled < 4) {
+          return;
+        }
+        prob = (function() {
+          var _i, _len, _ref, _results;
+          _results = [];
+          for (_i = 0, _len = house.length; _i < _len; _i++) {
+            cell = house[_i];
+            if (!cell.digit && !(cell["solverNS" + house.id] != null) && (2 <= (_ref = cell.rcand.length) && _ref <= 4)) {
+              _results.push(cell);
+            }
+          }
+          return _results;
+        })();
+        if (!(2 <= prob.length)) {
+          return;
+        }
+        for (i = 0, _ref = prob.length; i < _ref; i += 1) {
+          for (j = _ref2 = i + 1, _ref3 = prob.length; j < _ref3; j += 1) {
+            r = isNS([prob[i], prob[j]]);
+            if (r != null) {
+              r.house = house;
+              ns.push(r);
+            }
+          }
+        }
+        for (i = 0, _ref4 = prob.length; i < _ref4; i += 1) {
+          for (j = _ref5 = i + 1, _ref6 = prob.length; j < _ref6; j += 1) {
+            for (k = _ref7 = j + 1, _ref8 = prob.length; k < _ref8; k += 1) {
+              r = isNS([prob[i], prob[j], prob[k]]);
+              if (r != null) {
+                r.house = house;
+                ns.push(r);
+              }
+            }
+          }
+        }
+        for (i = 0, _ref9 = prob.length; i < _ref9; i += 1) {
+          for (j = _ref10 = i + 1, _ref11 = prob.length; j < _ref11; j += 1) {
+            for (k = _ref12 = j + 1, _ref13 = prob.length; k < _ref13; k += 1) {
+              for (t = _ref14 = k + 1, _ref15 = prob.length; t < _ref15; t += 1) {
+                r = isNS([prob[i], prob[j], prob[k], prob[t]]);
+                if (r != null) {
+                  r.house = house;
+                  ns.push(r);
+                }
+              }
+            }
+          }
+        }
+      });
+      return ns;
+    };
+    NakedSubsets.prototype.set = function() {
+      var cell, house, houses, mask, maskid, ns, ok, q, _i, _j, _k, _l, _len, _len2, _len3, _len4, _len5, _m, _ref, _ref2;
+      ns = this.findNakedSubsets();
+      for (_i = 0, _len = ns.length; _i < _len; _i++) {
+        q = ns[_i];
+        ok = true;
+        _ref = q.cells;
+        for (_j = 0, _len2 = _ref.length; _j < _len2; _j++) {
+          cell = _ref[_j];
+          if (cell.digit || (cell.solverNS != null)) {
+            ok = false;
+          }
+        }
+        if (!ok) {
+          continue;
+        }
+        houses = this.commonHouses(q.cells);
+        mask = [];
+        for (_k = 0, _len3 = houses.length; _k < _len3; _k++) {
+          house = houses[_k];
+          for (_l = 0, _len4 = house.length; _l < _len4; _l++) {
+            cell = house[_l];
+            if (!cell.digit && __indexOf.call(q.cells, cell) < 0 && __indexOf.call(mask, cell) < 0) {
+              mask.push(cell);
+            }
+          }
+        }
+        if (!mask.length) {
+          continue;
+        }
+        maskid = this.grid.mask(mask, q.digits, 'solver');
+        this.grid._history.add({
+          action: 'solverNS',
+          cells: q.cells,
+          maskid: maskid,
+          id: "_solverNS_" + maskid,
+          houseid: q.house.id
+        });
+        _ref2 = q.cells;
+        for (_m = 0, _len5 = _ref2.length; _m < _len5; _m++) {
+          cell = _ref2[_m];
+          cell["solverNS" + q.house.id] = true;
+        }
+        return true;
+      }
+      return false;
+    };
+    NakedSubsets.prototype.search = function() {
+      var cell, d, h, house, houses, mask, ns, ok, q, realMasks, _i, _j, _k, _l, _len, _len2, _len3, _len4, _len5, _len6, _len7, _m, _n, _o, _ref, _ref2;
+      if (this.found != null) {
+        throw new Error('New search while old results are not used!');
+      }
+      ns = this.findNakedSubsets();
+      for (_i = 0, _len = ns.length; _i < _len; _i++) {
+        q = ns[_i];
+        ok = true;
+        _ref = q.cells;
+        for (_j = 0, _len2 = _ref.length; _j < _len2; _j++) {
+          cell = _ref[_j];
+          if (cell.digit || (cell.solverNS != null)) {
+            ok = false;
+          }
+        }
+        if (!ok) {
+          continue;
+        }
+        houses = this.commonHouses(q.cells);
+        mask = [];
+        for (_k = 0, _len3 = houses.length; _k < _len3; _k++) {
+          house = houses[_k];
+          for (_l = 0, _len4 = house.length; _l < _len4; _l++) {
+            cell = house[_l];
+            if (!cell.digit && __indexOf.call(q.cells, cell) < 0 && __indexOf.call(mask, cell) < 0) {
+              mask.push(cell);
+            }
+          }
+        }
+        realMasks = 0;
+        for (_m = 0, _len5 = mask.length; _m < _len5; _m++) {
+          cell = mask[_m];
+          _ref2 = q.digits;
+          for (_n = 0, _len6 = _ref2.length; _n < _len6; _n++) {
+            d = _ref2[_n];
+            if (!cell.cand[d] && !cell.mask[d]) {
+              realMasks += 1;
+            }
+          }
+        }
+        if (!realMasks) {
+          continue;
+        }
+        for (_o = 0, _len7 = houses.length; _o < _len7; _o++) {
+          h = houses[_o];
+          this.grid.markHouse(h);
+        }
+        this.found = [mask, q];
+        this.grid.mark(q.cells, q.digits, 'green');
+        this.grid.mark(mask, q.digits, 'red');
+        this.msgid = this.grid.message("Naked subset in " + (((function() {
+          var _len8, _p, _ref3, _results;
+          _ref3 = q.cells;
+          _results = [];
+          for (_p = 0, _len8 = _ref3.length; _p < _len8; _p++) {
+            cell = _ref3[_p];
+            _results.push(cell.id);
+          }
+          return _results;
+        })()).join(', ')));
+        return true;
+      }
+      return false;
+    };
+    NakedSubsets.prototype.apply = function() {
+      var cell, mask, maskid, q, _i, _len, _ref, _ref2;
+      this.grid.removeMarks();
+      this.grid.removeHouseMarks();
+      this.grid.removeMessage(this.msgid);
+      _ref = this.found, mask = _ref[0], q = _ref[1];
+      this.found = null;
+      maskid = this.grid.mask(mask, q.digits, 'solver');
+      this.grid._history.add({
+        action: 'solverNS',
+        cells: q.cells,
+        maskid: maskid,
+        id: "_solverNS_" + maskid,
+        houseid: q.house.id
+      });
+      _ref2 = q.cells;
+      for (_i = 0, _len = _ref2.length; _i < _len; _i++) {
+        cell = _ref2[_i];
+        cell["solverNS" + q.house.id] = true;
+      }
+    };
+    NakedSubsets.prototype.discard = function() {
+      this.grid.removeMarks();
+      this.grid.removeHouseMarks();
+      this.grid.removeMessage(this.msgid);
+      this.found = null;
+    };
+    return NakedSubsets;
+  })();
+  SudokuSolver = (function() {
+    __extends(SudokuSolver, EventEmitter);
+    function SudokuSolver(opts) {
+      var defs, _ref;
+      if (!(this instanceof SudokuSolver)) {
+        return new SudokuSolver(opts);
+      }
+      defs = {
+        solve: false,
+        gncSpeed: 50
+      };
+      extend(defs, opts);
+      this._timers = {
+        gnc: false
+      };
+      this.grid = (_ref = defs.grid) != null ? _ref : new SudokuGrid;
+      if (!(this.grid instanceof SudokuGrid)) {
+        throw new Error('Grid is not of class SudokuGrid');
+      }
+      this.solve = defs.solve;
+      this.sbs = true;
+      this.algo = [["NakedSingles", new NakedSingles(this)], ["HiddenSingles", new HiddenSingles(this)], ["NakedSubsets", new NakedSubsets(this)]];
+      this.state = -1;
+      this.gncSpeed = defs.gncSpeed;
+      this._gnc = false;
+      this.history = new DLSet;
+      this.grid.message('Enter your starting digits, solution will appear on the fly.');
+      this.grid.on('loadMap', __bind(function() {
+        var s;
+        if (this._gnc) {
+          this.gncStop();
+        }
+        this.history = new DLSet;
+        if (this.state >= 0) {
+          s = this.state;
+          this.state = -1;
+          console.log("    discarding " + this.algo[s][0] + " because new sudoku loaded");
+          this.algo[s][1].discard();
+          return this.emit('solve');
+        }
+      }, this));
+      this.grid.on('change', __bind(function() {
+        return this._change();
+      }, this));
+      this.grid.on('unset', __bind(function(cell) {
+        return this._unset(cell);
+      }, this));
+      this.grid.on('delHouse', __bind(function(house) {
+        return this._delHouse(house);
+      }, this));
+      this.grid.on('error', __bind(function(cell) {
+        var s;
+        if (this.state >= 0) {
+          s = this.state;
+          this.state = -1;
+          console.log("    discarding " + this.algo[s][0] + " because of an error in " + cell.id);
+          this.algo[s][1].discard();
+          return this.emit('solve');
+        }
+      }, this));
+    }
+    SudokuSolver.prototype.commonHouses = function(cells) {
+      var cell, obj, t, _, _i, _len, _results;
+      t = {};
+      for (_i = 0, _len = cells.length; _i < _len; _i++) {
+        cell = cells[_i];
+        cell.houses.iter(function(house) {
+          if (t[house.id] != null) {
+            return t[house.id][0] += 1;
+          } else {
+            return t[house.id] = [1, house];
+          }
+        });
+      }
+      _results = [];
+      for (_ in t) {
+        obj = t[_];
+        if (obj[0] === cells.length) {
+          _results.push(obj[1]);
+        }
+      }
+      return _results;
+    };
+    SudokuSolver.prototype._isNakedSubset = function(a) {
+      var cand, cell, k, _i, _j, _len, _len2, _ref;
+      cand = [];
+      for (_i = 0, _len = a.length; _i < _len; _i++) {
+        cell = a[_i];
+        _ref = cell.rcand;
+        for (_j = 0, _len2 = _ref.length; _j < _len2; _j++) {
+          k = _ref[_j];
+          if (__indexOf.call(cand, k) < 0) {
+            cand.push(k);
+          }
+        }
+      }
+      if (cand.length === a.length) {
+        return {
+          digits: cand,
+          cells: a
+        };
+      }
+      return null;
+    };
+    SudokuSolver.prototype.findNakedSubsets = function() {
+      var isNS, ns, s;
+      ns = [];
+      isNS = this._isNakedSubset;
+      s = this.grid.s;
+      this.grid.houses.iter(function(house) {
+        var cell, i, j, k, prob, r, t, _ref, _ref10, _ref11, _ref12, _ref13, _ref14, _ref15, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9;
+        if (s - house.filled < 4) {
+          return;
+        }
+        prob = (function() {
+          var _i, _len, _ref, _results;
+          _results = [];
+          for (_i = 0, _len = house.length; _i < _len; _i++) {
+            cell = house[_i];
+            if (!cell.digit && !(cell["solverNS" + house.id] != null) && (2 <= (_ref = cell.rcand.length) && _ref <= 4)) {
+              _results.push(cell);
+            }
+          }
+          return _results;
+        })();
+        if (!(2 <= prob.length)) {
+          return;
+        }
+        for (i = 0, _ref = prob.length; i < _ref; i += 1) {
+          for (j = _ref2 = i + 1, _ref3 = prob.length; j < _ref3; j += 1) {
+            r = isNS([prob[i], prob[j]]);
+            if (r != null) {
+              r.house = house;
+              ns.push(r);
+              return false;
+            }
+          }
+        }
+        for (i = 0, _ref4 = prob.length; i < _ref4; i += 1) {
+          for (j = _ref5 = i + 1, _ref6 = prob.length; j < _ref6; j += 1) {
+            for (k = _ref7 = j + 1, _ref8 = prob.length; k < _ref8; k += 1) {
+              r = isNS([prob[i], prob[j], prob[k]]);
+              if (r != null) {
+                r.house = house;
+                ns.push(r);
+                return false;
+              }
+            }
+          }
+        }
+        for (i = 0, _ref9 = prob.length; i < _ref9; i += 1) {
+          for (j = _ref10 = i + 1, _ref11 = prob.length; j < _ref11; j += 1) {
+            for (k = _ref12 = j + 1, _ref13 = prob.length; k < _ref13; k += 1) {
+              for (t = _ref14 = k + 1, _ref15 = prob.length; t < _ref15; t += 1) {
+                r = isNS([prob[i], prob[j], prob[k], prob[t]]);
+                if (r != null) {
+                  r.house = house;
+                  ns.push(r);
+                  return false;
+                }
+              }
+            }
+          }
+        }
+      });
+      return ns;
+    };
+    SudokuSolver.prototype.findHiddenSingles = function() {
+      var hs, s;
+      hs = [];
+      s = this.grid.s;
+      this.grid.houses.iter(function(house) {
+        var cell, count, empty, k, last, _i, _len;
+        empty = (function() {
+          var _i, _len, _results;
+          _results = [];
+          for (_i = 0, _len = house.length; _i < _len; _i++) {
+            cell = house[_i];
+            if (!cell.digit) {
+              _results.push(cell);
+            }
+          }
+          return _results;
+        })();
+        for (k = 1; 1 <= s ? k <= s : k >= s; 1 <= s ? k++ : k--) {
+          count = 0;
+          last = false;
+          for (_i = 0, _len = empty.length; _i < _len; _i++) {
+            cell = empty[_i];
+            if (!(cell.cand[k] || cell.mask[k])) {
+              count += 1;
+              last = cell;
+            }
+          }
+          if (count === 1) {
+            hs.push([last, k, house]);
+          }
+        }
+      });
+      return hs;
+    };
+    SudokuSolver.prototype.step = function() {
+      var a, i, name, s, _len, _ref, _ref2;
+      if (this.state >= 0) {
+        console.log("    Got step request");
+        s = this.state;
+        this.state = -1;
+        this.algo[s][1].apply();
+        if (!this.solve) {
+          this.emit('solve');
+        }
+        return;
+      }
+      if (this.grid.errors || !this.solve) {
+        return this.emit('solve');
+      }
+      console.log("Searching for solutions...");
+      _ref = this.algo;
+      for (i = 0, _len = _ref.length; i < _len; i++) {
+        _ref2 = _ref[i], name = _ref2[0], a = _ref2[1];
+        if (!a.enabled) {
+          continue;
+        }
+        if (this.sbs && a.sbs) {
+          console.log("Trying " + name + " (step by step)");
+          if (a.search()) {
+            console.log("    " + name + " succeed");
+            this.state = i;
+            this.emit('waitStep');
+            return;
+          }
+        } else {
+          console.log("Trying " + name + " (fast)");
+          if (a.set()) {
+            console.log("    " + name + " succeed");
+            return;
+          }
+        }
+      }
+      console.log("Nothing left to do");
+      this.emit('solve');
+    };
+    SudokuSolver.prototype.technique = function(technique, sbs, enabled) {
+      var alg, i, _len, _ref;
+      _ref = this.algo;
+      for (i = 0, _len = _ref.length; i < _len; i++) {
+        alg = _ref[i];
+        if (alg[0] === technique) {
+          break;
+        }
+      }
+      if (i === solver.algo.length) {
+        return false;
+      }
+      if (sbs) {
+        return alg[1].sbs = enabled;
+      } else {
+        if (enabled) {
+          if (!alg[1].enabled) {
+            alg[1].enable();
+            return this._change();
+          }
+        } else {
+          if (alg[1].enabled) {
+            return alg[1].disable();
+          }
+        }
+      }
+    };
+    SudokuSolver.prototype._change = function() {
+      var cell, house, houses, hs, k, mask, maskid, ns, ok, q, set, _i, _j, _k, _l, _len, _len2, _len3, _len4, _len5, _len6, _len7, _m, _n, _o, _ref, _ref2, _ref3;
+      if (this.grid.errors) {
+        return this.emit('solve');
+      }
+      if (this.state >= 0 || !this.solve) {
+        return;
+      }
+      console.log("Grid updated");
+      this.step();
+      return;
+      if (this._nextStepSet.length) {
+        return;
+      }
+      if (this.grid.errors) {
+        return this.emit('solve');
+      }
+      this.step();
+      if (!this._nextStepSet.length) {
+        this.emit('solve');
+      }
+      return;
+      set = 0;
+      ns = this._nakedSingles;
+      this._nakedSingles = [];
+      for (_i = 0, _len = ns.length; _i < _len; _i++) {
+        cell = ns[_i];
+        if (cell.rcand.length !== 1 || cell.digit) {
+          continue;
+        }
+        try {
+          cell.set(cell.rcand[0], 'solver');
+          set += 1;
+        } catch (_e) {}
+      }
+      if (set) {
+        return;
+      }
+      hs = this.findHiddenSingles();
+      for (_j = 0, _len2 = hs.length; _j < _len2; _j++) {
+        _ref = hs[_j], cell = _ref[0], k = _ref[1];
+        if (cell.digit) {
+          continue;
+        }
+        try {
+          cell.set(k, 'solver');
+          set += 1;
+        } catch (_e) {}
+      }
+      if (set) {
+        return;
+      }
+      ns = this.findNakedSubsets();
+      for (_k = 0, _len3 = ns.length; _k < _len3; _k++) {
+        q = ns[_k];
+        ok = true;
+        _ref2 = q.cells;
+        for (_l = 0, _len4 = _ref2.length; _l < _len4; _l++) {
+          cell = _ref2[_l];
+          if (cell.digit || (cell.solverNS != null)) {
+            ok = false;
+          }
+        }
+        if (!ok) {
+          continue;
+        }
+        houses = this.commonHouses(q.cells);
+        mask = [];
+        for (_m = 0, _len5 = houses.length; _m < _len5; _m++) {
+          house = houses[_m];
+          for (_n = 0, _len6 = house.length; _n < _len6; _n++) {
+            cell = house[_n];
+            if (!cell.digit && __indexOf.call(q.cells, cell) < 0 && __indexOf.call(mask, cell) < 0) {
+              mask.push(cell);
+            }
+          }
+        }
+        set += 1;
+        maskid = this.grid.mask(mask, q.digits, 'solver');
+        this.grid._history.add({
+          action: 'solverNS',
+          cells: q.cells,
+          maskid: maskid,
+          id: "_solverNS_" + maskid,
+          houseid: q.house.id
+        });
+        _ref3 = q.cells;
+        for (_o = 0, _len7 = _ref3.length; _o < _len7; _o++) {
+          cell = _ref3[_o];
+          cell["solverNS" + q.house.id] = true;
+        }
+      }
+      if (set) {
+        return;
+      }
+      return this.emit('solve');
+    };
+    SudokuSolver.prototype._unset = function(deadCell) {
+      var cell, it, rec, s, _i, _len, _ref;
+      if (this.state >= 0) {
+        s = this.state;
+        this.state = -1;
+        console.log("    discarding " + this.algo[s][0] + " because " + deadCell.id + " lost its digit");
+        this.algo[s][1].discard();
+        this.emit('solve');
+      }
+      it = {
+        next: this.grid._history.head
+      };
+      while (true) {
+        it = it.next;
+        if (!it) {
+          break;
+        }
+        if (it.dead != null) {
+          continue;
+        }
+        rec = it.e;
+        if (rec.action === 'set' && rec.cell === deadCell) {
+          break;
+        }
+        if (rec.action === 'set' && rec.cell.source === 'solver') {
+          rec.cell.unset('solver');
+        }
+        if (rec.action === 'solverNS') {
+          _ref = rec.cells;
+          for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+            cell = _ref[_i];
+            delete cell["solverNS" + rec.houseid];
+          }
+          this.grid._history.remove("_solverNS_" + rec.maskid);
+          this.grid.unmask(rec.maskid, 'solver');
+        }
+      }
+    };
+    SudokuSolver.prototype._delHouse = function(house) {
+      var it, rec;
+      it = this.grid._history.head;
+      while (it) {
+        rec = it.e;
+        if (rec.action === 'addHouse' && rec.house === house) {
+          break;
+        }
+        if (rec.action === 'set' && rec.cell.source === 'solver') {
+          rec.cell.unset('solver');
+        }
+        it = it.next;
+      }
+    };
+    SudokuSolver.prototype.gncStart = function() {
+      if (this._gnc) {
+        return this;
+      }
+      this._gnc = true;
+      this._gncSCell = this.grid.headCell;
+      this._gncSDigit = 1;
+      this.emit('gncStart');
+      return this._gncIter();
+    };
+    SudokuSolver.prototype.gncStop = function() {
+      if (!this._gnc) {
+        return this;
+      }
+      this._gnc = false;
+      return this.emit('gncStop');
+    };
+    SudokuSolver.prototype.gncToggle = function() {
+      if (this._gnc) {
+        return this.gncStop();
+      } else {
+        return this.gncStart();
+      }
+    };
+    SudokuSolver.prototype.gncReset = function() {
+      var cell, _results;
+      cell = this.grid.headCell;
+      _results = [];
+      while (cell) {
+        if (cell.digit && cell.source === 'gnc') {
+          cell.unset('gnc');
+        }
+        _results.push(cell = cell.next);
+      }
+      return _results;
+    };
+    SudokuSolver.prototype._gncIter = function(stepback) {
+      var cell, k, _ref, _ref2;
+      if (stepback == null) {
+        stepback = false;
+      }
+      if (!this._gnc) {
+        return;
+      }
+      if (stepback || this.grid.errors) {
+        cell = this.grid.tailCell;
+        while (cell) {
+          if (cell.digit && cell.source === 'gnc') {
+            break;
+          }
+          cell = cell.prev;
+        }
+        if (!cell) {
+          return this.gncStop();
+        }
+        this._gncSCell = cell;
+        this._gncSDigit = cell.digit + 1;
+        cell.unset('gnc');
+      } else {
+        if (this.grid.filled === this.grid.total) {
+          return this.gncStop();
+        }
+        cell = this._gncSCell;
+        while (cell) {
+          if (!cell.digit) {
+            for (k = _ref = this._gncSDigit, _ref2 = this.grid.s; k <= _ref2; k += 1) {
+              if (!(cell.cand[k] || cell.mask[k])) {
+                break;
+              }
+            }
+            if (k !== this.grid.s + 1) {
+              break;
+            }
+            this._gncSDigit = 1;
+            return this._gncIter(true);
+          }
+          cell = cell.next;
+        }
+        if (!cell) {
+          return this.gncStop();
+        }
+        cell.set(k, 'gnc');
+        this._gncSCell = cell.next;
+        this._gncSDigit = 1;
+      }
+      return this.once('solve', __bind(function() {
+        return this._timers.gnc = setTimeout((__bind(function() {
+          this._timers.gnc = false;
+          return this._gncIter();
+        }, this)), this.gncSpeed);
+      }, this));
+    };
+    return SudokuSolver;
+  })();
+  this.SudokuSolver = SudokuSolver;
+  HouseList = (function() {
+    __extends(HouseList, DLSet);
+    function HouseList() {
+      HouseList.__super__.constructor.apply(this, arguments);
+    }
+    HouseList.prototype.add = function(house) {
+      var ref, _name, _ref;
+      ref = HouseList.__super__.add.call(this, house);
+      if ((_ref = this[_name = house.type]) == null) {
+        this[_name] = new DLList;
+      }
+      ref.tw = this[house.type].add(house);
+      return this;
+    };
+    HouseList.prototype.remove = function(house) {
+      var ref;
+      ref = HouseList.__super__.remove.call(this, house);
+      if (!ref) {
+        return this;
+      }
+      this[house.type].remove(ref.tw);
+      return this;
+    };
+    return HouseList;
+  })();
+  SudokuCell = (function() {
+    __extends(SudokuCell, EventEmitter);
+    function SudokuCell(opts) {
+      this.digit = 0;
+      this.source = '';
+      this.houses = new HouseList;
+      this.cand = [];
+      this.mask = [];
+      this.colors = null;
+      this.rcand = [];
+      this.s = 9;
+      this.touched = false;
+      this.err = false;
+      extend(this, opts);
+      this.cand.fill([1 + this.s], 0);
+      this.mask.fill([1 + this.s], 0);
+      this.id = this.coord();
+    }
+    SudokuCell.prototype.coord = function() {
+      return "" + (_aa(this.i)) + (1 + this.j);
+    };
+    SudokuCell.prototype.coordx = function() {
+      return this._aa(this.i);
+    };
+    SudokuCell.prototype.coordy = function() {
+      return "" + (1 + this.j);
+    };
+    SudokuCell.prototype.setUser = function() {
+      var oldsource, _ref;
+      if (!this.digit) {
+        throw new Error('No digit in the cell');
+      }
+      if (this.source === 'user') {
+        return this;
+      }
+      _ref = [this.source, 'user'], oldsource = _ref[0], this.source = _ref[1];
+      return this.emit('chsrc', oldsource);
+    };
+    SudokuCell.prototype.set = function(k, source, force) {
+      var t;
+      if (force == null) {
+        force = false;
+      }
+      if (!((1 <= k && k <= this.s)) || Math.ceil(k !== k)) {
+        throw new Error("Invalid digit: " + k);
+      }
+      if (this.digit) {
+        throw new Error("Cell already has digit");
+      }
+      if (!force && (this.cand[k] || this.mask[k])) {
+        throw new Error("Cann't set that digit");
+      }
+      this.digit = +k;
+      this.source = source;
+      t = this.grid._touched;
+      this.houses.iter(function(house) {
+        var sibling, _i, _len;
+        for (_i = 0, _len = house.length; _i < _len; _i++) {
+          sibling = house[_i];
+          sibling.cand[k] += 1;
+          if (!sibling.touched) {
+            sibling.touched = true;
+            t.push(sibling);
+          }
+        }
+        return house.filled += 1;
+      });
+      return this.emit('set');
+    };
+    SudokuCell.prototype.unset = function(source) {
+      var k, t;
+      if (!this.digit) {
+        throw new Error("No digit in the cell");
+      }
+      if (this.source !== source) {
+        throw new Error("Access denied");
+      }
+      k = this.digit;
+      this.digit = 0;
+      t = this.grid._touched;
+      this.houses.iter(function(house) {
+        var sibling, _i, _len;
+        for (_i = 0, _len = house.length; _i < _len; _i++) {
+          sibling = house[_i];
+          sibling.cand[k] -= 1;
+          if (!sibling.touched) {
+            sibling.touched = true;
+            t.push(sibling);
+          }
+        }
+        return house.filled -= 1;
+      });
+      return this.emit('unset');
+    };
+    SudokuCell.prototype.step = function(x, y) {
+      var cell;
+      cell = this;
+      if (x >= 0) {
+        while ((x -= 1) >= 0) {
+          cell = cell.bottom;
+        }
+      } else {
+        while ((x += 1) <= 0) {
+          cell = cell.top;
+        }
+      }
+      if (y >= 0) {
+        while ((y -= 1) >= 0) {
+          cell = cell.right;
+        }
+      } else {
+        while ((y += 1) <= 0) {
+          cell = cell.left;
+        }
+      }
+      return cell;
+    };
+    return SudokuCell;
+  })();
+  SudokuGrid = (function() {
+    __extends(SudokuGrid, EventEmitter);
+    function SudokuGrid(opts) {
+      var defs;
+      if (!(this instanceof SudokuGrid)) {
+        return new SudokuGrid(opts);
+      }
+      defs = {};
+      extend(defs, opts);
+      this.headCell = this.tailCell = false;
+      this._messages = [];
+      this._ch = false;
+    }
+    SudokuGrid.prototype._changed = function() {
+      if (this._ch) {
+        return this;
+      }
+      this._ch = true;
+      process.nextTick(__bind(function() {
+        var cell, err, i, k, newcand, s, tcopy, updated, _i, _j, _len, _len2, _len3, _ref;
+        this._ch = false;
+        if (!this.headCell) {
+          return;
+        }
+        tcopy = this._touched;
+        this._touched = [];
+        for (_i = 0, _len = tcopy.length; _i < _len; _i++) {
+          cell = tcopy[_i];
+          cell.touched = false;
+        }
+        for (_j = 0, _len2 = tcopy.length; _j < _len2; _j++) {
+          cell = tcopy[_j];
+          updated = false;
+          if (cell.digit) {
+            cell.rcand = [];
+            err = cell.cand[cell.digit] !== cell.houses.length;
+          } else {
+            s = this.s;
+            newcand = (function() {
+              var _results;
+              _results = [];
+              for (k = 1; k <= s; k += 1) {
+                if (cell.cand[k] + cell.mask[k] === 0) {
+                  _results.push(k);
+                }
+              }
+              return _results;
+            })();
+            updated = newcand.length !== cell.rcand.length;
+            if (!updated) {
+              _ref = cell.rcand;
+              for (i = 0, _len3 = _ref.length; i < _len3; i++) {
+                k = _ref[i];
+                if (k !== newcand[i]) {
+                  updated = true;
+                }
+              }
+            }
+            if (updated) {
+              cell.rcand = newcand;
+            }
+            err = cell.rcand.length === 0;
+          }
+          if (err && !cell.err) {
+            cell.err = true;
+            this.errors += 1;
+            this.emit('error', cell);
+          } else if (!err && cell.err) {
+            cell.err = false;
+            this.errors -= 1;
+            this.emit('fix', cell);
+          }
+          if (updated) {
+            this.emit('touch', cell);
+          }
+        }
+        return this.emit('change');
+      }, this));
+      return this;
+    };
+    SudokuGrid.prototype.isCell = function(cell) {
+      return this.headCell && cell instanceof SudokuCell && cell.grid === this;
+    };
+    SudokuGrid.prototype.undo = function() {
+      var it, rec;
+      it = this._history.head;
+      while (it) {
+        rec = it.e;
+        if (rec.action === 'addHouse') {
+          this.delHouse(rec.house);
+          break;
+        }
+        if (rec.action === 'set' && rec.cell.source === 'user') {
+          rec.cell.unset('user');
+          break;
+        }
+        it = it.next;
+      }
+    };
+    SudokuGrid.prototype.clear = function() {
+      var cell;
+      if (!this.headCell) {
+        throw new Error('No map loaded');
+      }
+      cell = this.headCell;
+      while (cell) {
+        if (cell.digit) {
+          cell.unset(cell.source);
+        }
+        cell = cell.next;
+      }
+      return this;
+    };
+    SudokuGrid.prototype.unloadMap = function(complete) {
+      var i, t, _i, _len, _ref;
+      if (complete == null) {
+        complete = true;
+      }
+      for (t in this.timers) {
+        if (this.timers[t]) {
+          clearTimeout(this.timers[t]);
+          this.timers[t] = false;
+        }
+      }
+      _ref = ['w', 'h', 'boxes', 's', 'mi', 'mj', 'grids', '_history', 'houses', 'errors', 'filled', 'ufilled', 'total', '_touched', '_marks', '_houseMarks', 'agrid', 'gr'];
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        i = _ref[_i];
+        delete this[i];
+      }
+      this.headCell = this.tailCell = false;
+      return this.emit('unloadMap');
+    };
+    SudokuGrid.prototype.messageID = 0;
+    SudokuGrid.prototype.message = function(html) {
+      var id;
+      id = SudokuGrid.prototype.messageID;
+      SudokuGrid.prototype.messageID += 1;
+      this._messages.push([id, html]);
+      this.emit('message', html);
+      return id;
+    };
+    SudokuGrid.prototype.removeMessage = function(id) {
+      var e, i, pos, _len, _ref, _ref2;
+      _ref = this._messages;
+      for (pos = 0, _len = _ref.length; pos < _len; pos++) {
+        e = _ref[pos];
+        if (e[0] === id) {
+          break;
+        }
+      }
+      if (pos >= this._messages.length) {
+        return;
+      }
+      for (i = pos, _ref2 = this._messages.length - 1; i < _ref2; i += 1) {
+        this._messages[i] = this._messages[i + 1];
+      }
+      this._messages.pop();
+      if (pos && pos === this._messages.length) {
+        return this.emit('message', this._messages[this._messages.length - 1][1]);
+      }
+    };
+    SudokuGrid.prototype.markHouse = function(house) {
+      this._houseMarks.push(house);
+      return this.emit('markHouse', house, Math.min(3, this._houseMarks.length));
+    };
+    SudokuGrid.prototype.removeHouseMarks = function() {
+      var hmarks, house, _i, _len, _results;
+      hmarks = this._houseMarks;
+      this._houseMarks = [];
+      _results = [];
+      for (_i = 0, _len = hmarks.length; _i < _len; _i++) {
+        house = hmarks[_i];
+        _results.push(this.emit('unmarkHouse', house));
+      }
+      return _results;
+    };
+    SudokuGrid.prototype.mark = function(cells, digits, color) {
+      var cell, d, _i, _j, _len, _len2, _ref;
+      if (color == null) {
+        color = 'green';
+      }
+      for (_i = 0, _len = cells.length; _i < _len; _i++) {
+        cell = cells[_i];
+        this._marks.push(cell);
+        if ((_ref = cell.colors) == null) {
+          cell.colors = {};
+        }
+        for (_j = 0, _len2 = digits.length; _j < _len2; _j++) {
+          d = digits[_j];
+          cell.colors[d] = color;
+        }
+      }
+      return this.emit('mark', cells);
+    };
+    SudokuGrid.prototype.removeMarks = function() {
+      var cell, cells, _i, _len;
+      cells = this._marks;
+      this._marks = [];
+      for (_i = 0, _len = cells.length; _i < _len; _i++) {
+        cell = cells[_i];
+        cell.colors = null;
+      }
+      return this.emit('unmark', cells);
+    };
+    SudokuGrid.prototype.maskID = 0;
+    SudokuGrid.prototype.mask = function(cells, digits, source) {
+      var cell, d, id, rec, _i, _j, _len, _len2;
+      id = SudokuGrid.prototype.maskID;
+      SudokuGrid.prototype.maskID += 1;
+      rec = {
+        action: 'mask',
+        id: "_mask_" + id,
+        cells: [],
+        source: source
+      };
+      for (_i = 0, _len = cells.length; _i < _len; _i++) {
+        cell = cells[_i];
+        rec.cells.push(cell);
+        for (_j = 0, _len2 = digits.length; _j < _len2; _j++) {
+          d = digits[_j];
+          cell.mask[d] += 1;
+        }
+        if (!cell.touched) {
+          cell.touched = true;
+          this._touched.push(cell);
+        }
+      }
+      rec.digits = (function() {
+        var _k, _len3, _results;
+        _results = [];
+        for (_k = 0, _len3 = digits.length; _k < _len3; _k++) {
+          d = digits[_k];
+          _results.push(d);
+        }
+        return _results;
+      })();
+      this._history.add(rec);
+      this._changed();
+      return id;
+    };
+    SudokuGrid.prototype.unmask = function(id, source) {
+      var cell, d, rec, _i, _j, _len, _len2, _ref, _ref2;
+      rec = this._history["_mask_" + id].e;
+      if (rec == null) {
+        throw new Error('No such mask');
+      }
+      if (rec.source !== source) {
+        throw new Error('Access denied');
+      }
+      _ref = rec.cells;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        cell = _ref[_i];
+        _ref2 = rec.digits;
+        for (_j = 0, _len2 = _ref2.length; _j < _len2; _j++) {
+          d = _ref2[_j];
+          cell.mask[d] -= 1;
+          if (!cell.touched) {
+            cell.touched = true;
+            this._touched.push(cell);
+          }
+        }
+      }
+      this._history.remove("_mask_" + id);
+      return this._changed();
+    };
+    SudokuGrid.prototype._cellSet = function() {
+      this.grid.filled += 1;
+      if (this.source === 'user') {
+        this.grid.ufilled += 1;
+      }
+      this.grid._history.add({
+        action: 'set',
+        cell: this,
+        id: "_set_" + this.id
+      });
+      this.grid.emit('set', this);
+      return this.grid._changed();
+    };
+    SudokuGrid.prototype._cellUnset = function() {
+      this.grid.filled -= 1;
+      if (this.source === 'user') {
+        this.grid.ufilled -= 1;
+      }
+      this.grid.emit('unset', this);
+      this.grid._history.remove("_set_" + this.id);
+      return this.grid._changed();
+    };
+    SudokuGrid.prototype._cellChsrc = function(old) {
+      if (this.source === 'user') {
+        this.grid.ufilled += 1;
+      }
+      if (old === 'user') {
+        this.grid.ufilled -= 1;
+      }
+      this.grid.emit('cellChsrc', this, old);
+      return this.grid._changed();
+    };
+    SudokuGrid.prototype.saveMap = function() {
+      var defgrid, grid, h, map, _i, _len, _ref;
+      map = [];
+      if (this.h !== 3 || this.w !== 3) {
+        map.push("" + this.h + "x" + this.w);
+      }
+      defgrid = this.grids.length === 1 && this.grids[0].pos.i === 0 && this.grids[0].pos.j === 0;
+      if (!defgrid) {
+        _ref = this.grids;
+        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+          grid = _ref[_i];
+          map.push("" + grid.pos.i + ":" + grid.pos.j);
+        }
+      }
+      h = [];
+      this.houses.iter(function(house) {
+        var _ref2;
+        if ((_ref2 = house.type) === 'diag1' || _ref2 === 'diag2') {
+          return h.push("h=" + house.type + ":" + house.s);
+        }
+      });
+      while (h.length) {
+        map.push(h.pop());
+      }
+      if (this.symbtxt !== false) {
+        map.push("symb=" + this.symbtxt);
+      }
+      return map.join(',');
+    };
+    SudokuGrid.prototype.saveData = function() {
+      var cell, data, sp;
+      data = '';
+      sp = 0;
+      cell = this.headCell;
+      while (cell) {
+        if (cell.digit && cell.source === 'user') {
+          data += '*'.repeat(Math.floor(sp / 25));
+          sp %= 25;
+          data += ':'.repeat(Math.floor(sp / 5));
+          sp %= 5;
+          data += '.'.repeat(sp) + this.symb[cell.digit].pad(this.symbSize, '_', 'left');
+          sp = 0;
+        } else {
+          sp += 1;
+        }
+        cell = cell.next;
+      }
+      return data;
+    };
+    SudokuGrid.prototype.loadData = function(data) {
+      var c, cell, i, j, k, _len;
+      if (!((data != null) && typeof data === 'string')) {
+        return this;
+      }
+      cell = this.headCell;
+      for (i = 0, _len = data.length; i < _len; i++) {
+        c = data[i];
+        if (!cell) {
+          break;
+        }
+        if (c === '.') {
+          cell = cell.next;
+        } else if (c === ':') {
+          for (j = 0; j < 5; j++) {
+            if (cell) {
+              cell = cell.next;
+            }
+          }
+        } else if (c === '*') {
+          for (j = 0; j < 25; j++) {
+            if (cell) {
+              cell = cell.next;
+            }
+          }
+        } else {
+          k = this.symb.indexOf(data.substr(i, this.symbSize).replace(/_/g, ''));
+          if ((1 <= k && k <= this.s)) {
+            cell.set(k, 'user', true);
+            i += this.symbSize - 1;
+          }
+          cell = cell.next;
+        }
+      }
+      return this;
+    };
+    SudokuGrid.prototype.load = function(data) {
+      var i, map, t, vars;
+      if (typeof data !== 'string') {
+        throw new Error("Type of data is '" + (typeof data) + "', expected: 'string'");
+      }
+      data = data.split(/\,/);
+      map = {
+        h: 3,
+        w: 3,
+        grids: [],
+        houses: []
+      };
+      i = 0;
+      vars = {
+        l: 1
+      };
+      if (i < data.length && data[i].match(/^\d+x\d+$/)) {
         t = data[i].split(/x/);
         map.h = +t[0];
         map.w = +t[1];
-        i++;
-    }
-    while (i < data.length && data[i].match(/^\d+;\d+$/)) {
-        t = data[i].split(/;/);
+        i += 1;
+      }
+      while (i < data.length && data[i].match(/^\d+:\d+$/)) {
+        t = data[i].split(/:/);
         map.grids.push([+t[0], +t[1]]);
-        i++;
-    }
-    if (!map.grids.length) {
+        i += 1;
+      }
+      if (!map.grids.length) {
         map.grids.push([0, 0]);
-    }
-    while (i < data.length) {
-        if (data[i].match(/^h=\d+;\d+$/)) {
-            t = (data[i].split(/=/))[1].split(/;/);
-            if (+t[0] === 3 || +t[0] === 4) {
-                map.houses.push({type: +t[0], grid: +t[1]});
-            }
-            i++;
-        } else {
-            break;
-        }
-    }
-    while (i < data.length && data[i].match(/^\w+=.+$/)) {
+      }
+      while (i < data.length && data[i].match(/^h=[a-zA-Z0-9]+:[A-Z]+[0-9]+$/)) {
+        t = data[i].split(/=/)[1].split(/:/);
+        map.houses.push({
+          type: t[0],
+          start: t[1]
+        });
+        i += 1;
+      }
+      while (i < data.length && data[i].match(/^\w+=.+$/)) {
         t = data[i].split(/=/);
         vars[t[0]] = t[1];
-        i++;
-    }
-    if ("symb" in vars) {
+        i += 1;
+      }
+      if (vars.symb != null) {
         map.symb = vars.symb;
-    }
-    if (i === data.length - 1 && data[i].match(/^[\._0-9A-Z]*$/)) {
+      }
+      if (i === data.length - 1) {
         map.data = data[i];
-    }
-    return this.load_map(map);
-}
-
-SudokuSolver.prototype.show_selector = function () {
-    if (!(this.interactive && this.rendered)) {
-        return this;
-    }
-    if (this.timers.selector) {
-        clearTimeout(this.timers.selector);
-        this.timers.selector = false;
-    }
-    var nx, ny, node;
-    for (var k = 0; k < this.s; k++) {
-        if (this.acell.cand[1 + k] || this.acell.mask[1 + k]) {
-            $(this.gr.selector.childNodes[k]).addClass("disabled");
-        } else {
-            $(this.gr.selector.childNodes[k]).removeClass("disabled");
-        }
-    }
-    nx = this.acell.g.x + 0.5*(this.g.cell_w - this.g.sel_tw);
-    ny = this.acell.g.y + 0.5*(this.g.cell_h - this.g.sel_th);
-    if (nx + this.g.sel_tw > this.g.canv_w) {
-        nx = this.g.canv_w - this.g.sel_tw;
-    }
-    if (ny + this.g.sel_th > this.g.canv_h) {
-        ny = this.g.canv_h - this.g.sel_th;
-    }
-    if (nx < 0) {
-        nx = 0;
-    }
-    if (ny < 0) {
-        ny = 0;
-    }
-    $(this.gr.selector).attr("transform", "translate("+nx+","+ny+")").show();
-    this.gr.selector.scrollIntoViewIfNeeded();
-    return this;
-}
-
-SudokuSolver.prototype.isCell = function (cell) {
-    try {
-        return this.m[cell.x][cell.y] === cell;
-    } catch (e) {
-        return false;
-    }
-}
-
-SudokuSolver.prototype.select_cell = function (cell, showSelector) {
-    if (!this.interactive) {
-        /* error handling */
-        return this;
-    }
-    if (!this.isCell(cell) && cell !== false) {
-        /* error handling */
-        return this;
-    }
-    var oldcell = this.acell;
-    this.acell = cell;
-    if (this.rendered) {
-        if (oldcell !== false) {
-            $(oldcell.g.node).removeClass("active");
-        }
-        if (this.acell !== false) {
-            $(this.acell.g.node).addClass("active");
-            if (!this.acell.digit && showSelector !== false) {
-                this.show_selector();
-            } else {
-                this.selector_hide(true);
-            }
-        } else {
-            this.selector_hide(true);
-        }
-        //this.acell.g.node.scrollIntoViewIfNeeded();
-    }
-    this.emit('select_cell');
-    return this;
-}
-
-SudokuSolver.prototype.cell_click = function (el, e, cell) {
-    if (e.ctrlKey || e.altKey || e.shiftKey || e.metaKey) {
-        return;
-    }
-    if (cell.digit && cell.source !== 'user') {
-        this.select_user(cell);
-    } else if (cell.digit) {
-        this.cancel(cell, 'user');
-    } else {
-        this.select_cell(cell);
-    }
-}
-
-SudokuSolver.prototype.cell_click_f = function (ii, jj) {
-    var i = ii, j = jj, t = this;
-    return function (e) { t.cell_click(this, e, t.m[i][j]); };
-}
-
-SudokuSolver.prototype.selector_click = function (el, e, k) {
-    if (!e.shiftKey && (this.acell.cand[k] || this.acell.mask[k])) return;
-    this.selector_hide(true);
-    this.select(this.acell, k, 'user', e.shiftKey);
-}
-
-SudokuSolver.prototype.selector_click_f = function (kk) {
-    var k = kk, t = this;
-    return function (e) { t.selector_click(this, e, k); }
-}
-
-SudokuSolver.prototype.unload = function () {
-    if (this.gnc) {
-        this.gnc_stop();
-    }
-    this.aftersolve = [];
-    for (var i in this.timers) if (this.timers[i]) {
-        clearTimeout(this.timers[i]);
-        this.timers[i] = false;
-    }
-    this.solving = false;
-    this.rootNode.svg('destroy');
-    this.svg = false;
-    this.rendered = false;
-    this.state = -1;
-    this.m = [];
-    this.grids = [];
-    this.houses = {};
-}
-
-SudokuSolver.prototype.load_sym = function (s) {
-    this.symbtxt = false;
-    if (typeof s === "string" && s.length && s.length % this.s === 0) {
-        this.symbtxt = s;
-        var n = s.length / this.s;
-        this.symb = [''];
-        for (var i = 0; i < this.s; i++) {
-            this.symb.push(s.substr(i * n, n));
-        }
-    } else if (this.s < 16) {
-        this.symb = ['', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
-    } else {
-        this.symb = ['', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-        for (var i = 0; i < this.s - 10; i++) {
-            this.symb.push(aa(i));
-        }
-    }
-    this.symbSize = this.symb[this.symb.length - 1].length;
-    if (this.rendered) {
-        for (var j = 0, cell; j < this.my; j++) for (var i = 0; i < this.mx; i++) if ((cell = this.m[i][j]) && cell.digit) {
-            $("text", cell.g.node).text(this.symb[cell.digit]);
-        }
-        if (this.interactive) {
-            for (var i = 0; i < this.s; i++) {
-                $("text", this.gr.selector.childNodes[i]).text(this.symb[1 + i]);
-            }
-        }
-    }
-    this.upd('update');
-}
-
-SudokuSolver.prototype.load_map = function (map) {
-    if (this.gnc) {
-        this.gnc_stop();
-    }
-    this.aftersolve = [];
-    for (var i in this.timers) if (this.timers[i]) {
-        clearTimeout(this.timers[i]);
-        this.timers[i] = false;
-    }
-    this.solving = false;
-    if (typeof map !== "object") {
-        map = {};
-    }
-    this.state = 0;
-    this.rendered = false;
-    this.w = Math.floor(+map.w);
-    this.h = Math.floor(+map.h);
-    if (!(1 <= this.w && this.w <= 100000 && 1 <= this.h && this.h <= 100000)) {
-        this.w = 3;
-        this.h = 3;
-    }
-    if (this.h === 1) {
-        this.h = this.w;
-        this.w = 1;
-    }
-    this.boxes = this.w !== 1;
-    this.s = this.w * this.h;
-    this.load_sym(map.symb);
-    this.mx = 0;
-    this.my = 0;
-    var vgrids = [];
-    try {
-        for (var z = 0; z < map.grids.length; z++) {
-            var x = Math.floor(+map.grids[z][0]),
-                y = Math.floor(+map.grids[z][1]);
-            if (!(0 <= x && x <= 100000 && 0 <= y && y <= 100000)) {
-                continue;
-            }
-            if (this.boxes && (x % this.h || y % this.w)) {
-                continue;
-            }
-            vgrids.push([x, y]);
-            if (x + this.s > this.mx) {
-                this.mx = x + this.s;
-            }
-            if (y + this.s > this.my) {
-                this.my = y + this.s;
-            }
-        }
-    } catch (e) {};
-    if (vgrids.length == 0) {
-        vgrids.push([0, 0]);
-        this.mx = this.my = this.s;
-    }
-    this.m = array([this.mx, this.my]);
-    this.errors = 0;
-    this.filled = 0;
-    this.ufilled = 0;
-    this.total = 0;
-    this.grids = [];
-    this.houses = {};
-    for (var z = 0; z < vgrids.length; z++) {
-        // filling map
-        var x = vgrids[z][0], y = vgrids[z][1], grid = {};
-        grid.id = this.grids.push(grid) - 1;
-        for (var i = x; i < x + this.s; i++) for (var j = y; j < y + this.s; j++) {
-            if (this.m[i][j]) {
-                this.m[i][j].grids.push(grid);
-                continue;
-            }
-            this.m[i][j] = {
-                digit: 0, // placed digit (1..size, 0 - empty cell);
-                source: '',
-                houses: [], // list of houses;
-                cand: array([1 + this.s], 0), // candidates (0 - is candidate);
-                rcand: [], // digits that can be set into this cell (updates with .validate())
-                mask: array([1 + this.s], 0), // mask (non zero - masked);
-                solver: {ns: {}}, // ns - naked subset - is cell is a part of a naked subset;
-                touched: false,
-                error: false, // error bit;
-                x: i, y: j,
-                grids: [grid]
-            };
-            this.total++;
-        }
-        grid.pos = this.m[x][y];
-
-        // houses
-        for (var i = 0; i < this.s; i++) {
-            this.addhouse(0, grid, i); // columns
-            this.addhouse(1, grid, i); // rows
-            this.addhouse(2, grid, i); // boxes
-        }
-    }
-    for (var j = 0; j < this.my; j++) for (var i = 0; i < this.mx; i++) if (this.m[i][j]) {
-        this.select_cell(this.m[i][j]);
-        j = this.my; // break 2 levels
-        break;
-    }
-    this.agrid = this.grids[0];
-
-    if (map.houses) {
-        try {
-            for (var i = 0; i < map.houses.length; i++) {
-                switch (map.houses[i].type) {
-                  case 3:
-                    if (!this.grids[map.houses[i].grid]) {
-                        break;
-                    }
-                    this.addhouse(3, this.grids[map.houses[i].grid]);
-                    break;
-                  case 4:
-                    if (!this.grids[map.houses[i].grid]) {
-                        break;
-                    }
-                    this.addhouse(4, this.grids[map.houses[i].grid]);
-                    break;
-                }
-            }
-        } catch (e) {};
-    }
-
-    if (map.data) {
-        try {
-            for (var i = 0, p = 0; i < map.data.length; i++, p++) if (map.data.substr(i, 1) !== '.') {
-                var place = map.data.substr(i, this.symbSize);
-                for (var j = 1; j < this.symb.length; j++) if (this.symb[j] === place) {
-                    break;
-                }
-                if (j === this.symb.length) {
-                    continue;
-                }
-                this.select(this.getcellbynumber(p), j, 'user', true);
-                i += this.symbSize - 1;
-            }
-        } catch (e) {};
-    }
-
-    if (this.svg) {
-        this.render();
-    } else if (this.rootNode.length) {
-        var t = this;
-        this.rootNode.svg({onLoad: function (svg) { t.svg = svg; t.render(); }});
-    }
-
-    this.solvelogclear();
-    this.upd('stats', 'update', 'solve');
-
-    this.emit('load');
-}
-
-SudokuSolver.prototype.pos = function (x, y) {
-    if (y === void 0) { y = x.y; x = x.x; }
-    return {
-        x: this.g.padding + this.g.cell_w * (x + 1),
-        y: this.g.padding + this.g.cell_h * (y + 1)
+      }
+      return this.loadMap(map);
     };
-}
-
-SudokuSolver.prototype.center = function (x, y) {
-    if (y === void 0) { y = x.y; x = x.x; }
-    return {
-        x: this.g.padding + this.g.cell_w * (x + 1.5),
-        y: this.g.padding + this.g.cell_h * (y + 1.5)
-    };
-}
-
-SudokuSolver.prototype.renderDiff = function () {
-    var self = this;
-
-    while (self.obsolete.length) {
-        var cell = self.obsolete.pop();
-        if (cell.g.digit !== cell.digit) {
-
-        }
-    }
-
-    return self;
-}
-
-SudokuSolver.prototype.render = function () {
-    var stime = (new Date()).getTime();
-    var t = this, svg = this.svg, g = this.g, m = this.m;
-    g.canv_w = (this.mx+1)*g.cell_w + 2*g.padding;
-    g.canv_h = (this.my+1)*g.cell_h + 2*g.padding;
-    g.tx = g.cell_w / 2;
-    g.ty = g.cell_h / 2 + 7;
-    svg.clear(true);
-    svg.configure({width: g.canv_w, height: g.canv_h}, true);
-    svg.style("\
-#cells rect { fill: #fff; stroke: #000; stroke-width: 0.2; }\
-#cells.keyboard g.active rect { fill: #ccc; }\
-#cells g.error rect { fill: #f45252; }\
-#cells g.error.active rect { fill: #f42222; }\
-#cells text { fill: #666; cursor: default; text-anchor: middle; }\
-#cells text.user { fill: #000; }\
-#cells text.solver { fill: #e00; }\
-#cells text.gnc { fill: #080; }\
-#cells text.cand { fill: #222; cursor: default; text-anchor: start; font-family: serif; font-size: 8px; }\
-\
-#selector { opacity: 0.7; }\
-#selector:hover { opacity: 0.9; }\
-#selector rect { fill: #fff; stroke: #000; stroke-width: 0.2; stroke-linecap: round; }\
-#selector g:hover rect { fill: #f3f3f3; }\
-#selector text { fill: #000; font-size: 12px; text-anchor: middle; cursor: default; }\
-#selector g.disabled rect { fill: #fff; }\
-#selector g.disabled text { fill: #ccc; }\
-\
-#grid_id { opacity: 0.9; fill: #000; stroke: #fff; stroke-width: 2; text-anchor: middle; cursor: default; }\
-#grid_id text.active { fill: #e00; }\
-#grid_id text:hover { stroke: #66e; }");
-    var svgdefs = svg.defs();
-    var d = svg.group(svgdefs, {id: "diag1", fill: "#ccc"});
-    svg.circle(d, 0.2*g.cell_w, 0.2*g.cell_h, 0.1*g.cell_w);
-    svg.circle(d, 0.5*g.cell_w, 0.5*g.cell_h, 0.1*g.cell_w);
-    svg.circle(d, 0.8*g.cell_w, 0.8*g.cell_h, 0.1*g.cell_w);
-    d = svg.group(svgdefs, {id: "diag2", fill: "#ccc"});
-    svg.circle(d, 0.8*g.cell_w, 0.2*g.cell_h, 0.1*g.cell_w);
-    svg.circle(d, 0.5*g.cell_w, 0.5*g.cell_h, 0.1*g.cell_w);
-    svg.circle(d, 0.2*g.cell_w, 0.8*g.cell_h, 0.1*g.cell_w);
-    var gr = this.gr = {};
-    gr.coords = svg.group({
-        fill: "#888",
-        "font-size": 0.33*g.cell_h + "px",
-        cursor: "default",
-        "text-anchor": "middle"});
-    for (var i = 0; i < this.mx; i++) {
-        svg.text(gr.coords, this.center(i, 0).x, g.padding + g.cell_h / 2 + 8, ""+(i+1));
-    }
-    for (var i = 0; i < this.my; i++) {
-        svg.text(gr.coords, g.padding + g.cell_w / 2 + 5, this.center(0, i).y + 5, aa(i));
-    }
-    gr.cells = svg.group({id: "cells", "font-size": 0.7*g.cell_h + "px", class_: (this.kbdState ? "keyboard" : "")});
-    for (var j = 0, cell; j < this.my; j++) for (var i = 0; i < this.mx; i++) if (cell = m[i][j]) {
-        var p = this.pos(cell);
-        cell.g = {};
-        cell.g.node = svg.group(gr.cells);
-        cell.g.x = p.x;
-        cell.g.y = p.y;
-        cell.g.cand = false;
-        svg.rect(cell.g.node, p.x, p.y, g.cell_w, g.cell_h);
-        if (this.interactive) {
-            $(cell.g.node).bind('click', this.cell_click_f(i, j));
-        }
-        if (cell.error) {
-            $(cell.g.node).addClass("error");
-        }
-        if (cell === this.acell) {
-            $(cell.g.node).addClass("active");
-        }
-        for (var z = 0; z < cell.houses.length; z++) {
-            if (cell.houses[z].type === 3) {
-                svg.use(cell.g.node, "#diag1", {transform: "translate(" + p.x + ", " + p.y + ")", class_: "diag1"});
-            } else if (cell.houses[z].type === 4) {
-                svg.use(cell.g.node, "#diag2", {transform: "translate(" + p.x + ", " + p.y + ")", class_: "diag2"});
-            }
-        }
-        if (cell.digit) {
-            svg.text(cell.g.node,
-                cell.g.x + g.tx,
-                cell.g.y + g.ty,
-                this.symb[cell.digit],
-                {class_: cell.source});
-        }
-    }
-
-    gr.hborder = svg.group({
-        stroke: "#888",
-        "stroke-width": "2.5",
-        "stroke-linecap": "round"});
-    gr.mborder = svg.group({
-        stroke: "#000",
-        "stroke-width": "2.5",
-        "stroke-linecap": "round"});
-    for (var j = 0, cell; j < this.my; j++) for (var i = 0; i < this.mx; i++) if (cell = m[i][j]) {
-        var p = {x: cell.g.x, y: cell.g.y},
-            q = this.pos(i+1, j+1);
-        if (this.boxes) {
-            for (var z1 = 0; z1 < cell.houses.length; z1++) if (cell.houses[z1].type === 2) {
-                break;
-            }
-            if (i !== 0 && this.m[i - 1][j]) { // left
-                for (var z2 = 0; z2 < m[i - 1][j].houses.length; z2++) if (m[i - 1][j].houses[z2].type === 2) {
-                    break;
-                }
-                if (cell.houses[z1].id !== m[i - 1][j].houses[z2].id) {
-                    svg.path(gr.hborder, "M"+p.x+","+p.y+"L"+p.x+","+q.y);
-                }
-            }
-            if (j !== 0 && m[i][j - 1]) { // top
-                for (var z2 = 0; z2 < m[i][j - 1].houses.length; z2++) if (m[i][j - 1].houses[z2].type === 2) {
-                    break;
-                }
-                if (cell.houses[z1].id !== m[i][j - 1].houses[z2].id) {
-                    svg.path(gr.hborder, "M"+p.x+","+p.y+"L"+q.x+","+p.y);
-                }
-            }
-        }
-        if (j === 0 || !m[i][j - 1]) {
-            svg.path(gr.mborder, "M"+p.x+","+p.y+"L"+q.x+","+p.y);
-        }
-        if (i === 0 || !m[i - 1][j]) {
-            svg.path(gr.mborder, "M"+p.x+","+p.y+"L"+p.x+","+q.y);
-        }
-        if (i === this.mx - 1 || !m[i + 1][j]) {
-            svg.path(gr.mborder, "M"+q.x+","+p.y+"L"+q.x+","+q.y);
-        }
-        if (j === this.my - 1 || !m[i][j + 1]) {
-            svg.path(gr.mborder, "M"+p.x+","+q.y+"L"+q.x+","+q.y);
-        }
-    }
-
-    gr.grid_id = svg.group({id: "grid_id", "font-size": 0.8*this.s*g.cell_h + "px"});
-    for (var z = 0; z < this.grids.length; z++) {
-        var x = this.grids[z].pos.g.x + 0.5*this.s*g.cell_w,
-            y = this.grids[z].pos.g.y + 0.7*this.s*g.cell_h,
-            options = {};
-        if (this.grids[z] === this.agrid) {
-            options = {class_: 'active'};
-        }
-        this.grids[z].id_node = svg.text(gr.grid_id, x, y, "" + (z + 1), options);
-    }
-    $("text", gr.grid_id).click(function () { t.select_grid(this.textContent - 1); });
-    $(gr.grid_id).hide();
-
-    if (this.interactive) {
-        var n, cf;
-        gr.selector = svg.group({id: "selector"});
-        g.sel_nw = Math.ceil(Math.sqrt(this.s));
-        g.sel_nh = Math.floor(Math.sqrt(this.s));
-        g.sel_tw = g.sel_nw * g.sel_w;
-        g.sel_th = g.sel_nh * g.sel_h;
-        for (var j = 0, k = 1; j < g.sel_nh; j++) for (var i = 0; i < g.sel_nw; i++, k++) {
-            cf = this.selector_click_f(k);
-            n = svg.group(gr.selector);
-            svg.rect(n, i * g.sel_w, j * g.sel_h, g.sel_w, g.sel_h);
-            if (k > this.s) {
-                continue;
-            }
-            svg.text(n, g.sel_w * (i + 0.5), g.sel_h * (j + 0.7), this.symb[k]);
-            $(n).bind('click', this.selector_click_f(k));
-        }
-        svg.path(gr.selector, "M0,0L0," + g.sel_th + "L" + g.sel_tw + "," +
-            g.sel_th + "L" + g.sel_tw + ",0L0,0",
-            {fill: "none", stroke: "#888", "stroke-width": "1.5"});
-        $(gr.selector)
-            .bind('mouseover', function () {
-                if (t.timers.selector) {
-                    clearTimeout(t.timers.selector);
-                    t.timers.selector = false;
-                }
-            }).bind('mouseout', function () {
-                t.selector_hide();
-            }).hide();
-    }
-
-    this.rendered = true;
-
-    if (window.console) {
-        console.log("rendered in: " + ((new Date()).getTime() - stime));
-    }
-
-    return this;
-}
-
-SudokuSolver.prototype.show_grid_id = function () { $(this.gr.grid_id).show(); }
-SudokuSolver.prototype.hide_grid_id = function () { $(this.gr.grid_id).hide(); }
-
-SudokuSolver.prototype.select_grid = function (grid) {
-    if (this.rendered && this.agrid) {
-        $(this.agrid.id_node).removeClass("active");
-    }
-    this.agrid = false;
-    if (typeof grid === "number" || typeof grid === "string") {
-        if (this.grids[+grid]) {
-            this.agrid = this.grids[+grid];
-        }
-    } else if (typeof grid === "object" && grid.hasOwnProperty('id')) {
-        if (this.grids[+grid.id]) {
-            this.agrid = this.grids[+grid.id];
-        }
-    }
-    if (this.rendered) {
-        $(this.agrid.id_node).addClass("active");
-    }
-    this.emit('select_grid');
-    return this;
-}
-
-// .addhouse(type, grid, q);
-SudokuSolver.prototype.addhouse = function (type, grid, q) {
-    if (this.state === -1) {
-        throw {errmsg: "Cannot use addhouse while state = -1"};
-    }
-    var i, j, c;
-    var house = {type: +type, filled: 0, ns: 0};
-    switch (house.type) {
-      case 0: // it's a column
-        /* TODO: validate grid, q */
-        house.id = coord(this.m[grid.pos.x][grid.pos.y + q]);
-        house.s = "_0_" + house.id;
-        if (this.houses[house.s]) {
-            return false;
-        }
-        for (i = 0; i < this.s; i++) {
-            house[i] = this.m[grid.pos.x + i][grid.pos.y + q];
-        }
-        break;
-      case 1: // it's a row
-        /* TODO: validate grid, q */
-        house.id = coord(this.m[grid.pos.x + q][grid.pos.y]);
-        house.s = "_1_" + house.id;
-        if (this.houses[house.s]) {
-            return false;
-        }
-        for (i = 0; i < this.s; i++) {
-            house[i] = this.m[grid.pos.x + q][grid.pos.y + i];
-        }
-        break;
-      case 2: // it's a box
-        /* TODO: validate grid, q */
-        if (!this.boxes) {
-            return false;
-        }
-        var x = grid.pos.x + (q % this.h) * this.w,
-            y = grid.pos.y + Math.floor(q / this.h) * this.h;
-        house.id = coord(this.m[x][y]);
-        house.s = "_2_" + house.id;
-        if (this.houses[house.s]) {
-            return false;
-        }
-        for (i = 0; i < this.w; i++) for (j = 0; j < this.h; j++) {
-            house[i * this.h + j] = this.m[x + i][y + j];
-        }
-        break;
-      case 3: // it's a main diagonal
-        /* TODO: validate grid */
-        house.id = coord(grid.pos);
-        house.s = "_3_" + house.id;
-        if (this.houses[house.s]) {
-            return false;
-        }
-        house.grid = grid.id;
-        m: for (i = 0; i < this.s; i++) {
-            house[i] = this.m[grid.pos.x + i][grid.pos.y + i];
-            for (j = 0; j < house[i].houses.length; j++) if (house[i].houses[j].type === house.type) {
-                continue m;
-            }
-            if (this.rendered) {
-                this.svg.use(house[i].g.node, "#diag1",
-                    {transform: "translate(" + house[i].g.x + ", " + house[i].g.y + ")", class_: "diag1"});
-                var tnode = $("text", house[i].g.node); // text to front
-                if (tnode.length) {
-                    this.svg.add(house[i].g.node, tnode);
-                    this.svg.remove(tnode);
-                }
-            }
-        }
-        break;
-      case 4: // it's an antidiagonal
-        /* TODO: validate grid */
-        house.id = coord(this.m[grid.pos.x][grid.pos.y + this.s - 1]);
-        house.s = "_4_" + house.id;
-        if (this.houses[house.s]) {
-            return false;
-        }
-        house.grid = grid.id;
-        m: for (i = 0; i < this.s; i++) {
-            house[i] = this.m[grid.pos.x + i][grid.pos.y + this.s - 1 - i];
-            for (j = 0; j < house[i].houses.length; j++) if (house[i].houses[j].type === house.type) {
-                continue m;
-            }
-            if (this.rendered) {
-                this.svg.use(house[i].g.node, "#diag2",
-                    {transform: "translate(" + house[i].g.x + ", " + house[i].g.y + ")", class_: "diag2"});
-                var tnode = $("text", house[i].g.node); // text to front
-                if (tnode.length) {
-                    this.svg.add(house[i].g.node, tnode);
-                    this.svg.remove(tnode);
-                }
-            }
-        }
-        break;
-      default: throw {errmsg: 'unknown house type "' + type + '"'};
-    }
-    for (i = 0; i < this.s; i++) {
-        house[i].houses.push(house);
-        if (house.type > 4) {
-            for (j = 0, c = 0; j < house[i].houses.length; j++) if (house[i].houses[j].type === house.type) {
-                c++;
-            }
-            if (c === 1) {
-                house[i].node.addClass('uhouse-' + house.type);
-            }
-        }
-        if (house[i].digit) {
-            for (j = 0; j < this.s; j++) {
-                house[j].cand[house[i].digit]++;
-            }
-            house.filled++;
-        }
-    }
-    this.houses[house.s] = house;
-    this.resolve();
-    this.upd('update', 'stats');
-    return s;
-}
-
-// .gethouse(type, grid, q);
-SudokuSolver.prototype.gethouse = function (type, grid, q) {
-    switch (type) {
-      case 0: // it's a column
-        return this.houses["_0_" + coord(this.m[grid.pos.x][grid.pos.y + q])];
-      case 1: // it's a row
-        return this.houses["_1_" + coord(this.m[grid.pos.x + q][grid.pos.y])];
-      case 2: // it's a box
-        var x = grid.pos.x + (q % this.h) * this.w,
-            y = grid.pos.y + Math.floor(q / this.h) * this.h;
-        return this.houses["_2_" + coord(this.m[x][y])];
-      case 3: // it's a main diagonal
-        return this.houses["_3_" + coord(grid.pos)];
-      case 4: // it's an antidiagonal
-        return this.houses["_4_" + coord(this.m[grid.pos.x][grid.pos.y + this.s - 1])];
-      default: throw {errmsg: 'unknown house type "' + type + '"'};
-    }
-}
-
-// .delhouse(type, grid, q);
-// .delhouse(house);
-SudokuSolver.prototype.delhouse = function (type, grid, q) {
-    if (this.state === -1) {
-        throw {errmsg: "Cannot use delhouse while state = -1"};
-    }
-    var house, i, j, c;
-    if (grid === void 0 && q === void 0) {
-        house = type;
-    } else {
-        house = this.gethouse(type, grid, q);
-    }
-    if (!house) {
-        return false;
-    }
-    if (house.type <= 2) {
-        throw {errmsg: "You cann't delete houses with type <= 2"};
-    }
-    m: for (i = 0; i < this.s; i++) {
-        array_del_value(house[i].houses, house);
-        if (house[i].digit) {
-            for (j = 0; j < this.s; j++) {
-                house[j].cand[house[i].digit]--;
-            }
-        }
-        if (this.rendered) {
-            for (j = 0; j < house[i].houses.length; j++) if (house[i].houses[j].type === house.type) {
-                continue m;
-            }
-            if (house.type === 3) {
-                this.svg.remove($("use.diag1", house[i].g.node));
-            } else if (house.type === 4) {
-                this.svg.remove($("use.diag2", house[i].g.node));
-            } else if (house.type > 4) {
-                house[i].g.node.removeClass('uhouse-' + house.type);
-            }
-        }
-    }
-    delete this.houses[house.s];
-    this.upd('stats', 'update');
-    this.resolve();
-    return true;
-}
-
-/*
-from math import floor, log
-def aa(n):
-    p = floor(log(26+25*n)/log(26))
-    n -= (26**p - 26) // 25
-    out = ""
-    while p:
-        out = chr(ord("A") + n % 26) + out
-        n //= 26
-        p -= 1
-    return out
-*/
-
-function aa(n) {
-    var p = Math.floor(Math.log(26+25*n)/Math.log(26));
-    var out = "";
-    n -= Math.floor((Math.pow(26, p) - 26) / 25);
-    while (p) {
-        out = String.fromCharCode("A".charCodeAt(0) + n % 26) + out;
-        n = Math.floor(n / 26);
-        p -= 1
-    }
-    return out;
-}
-
-function coord(cell)  { return aa(cell.x) + (1 + cell.y); }
-function coordx(cell) { return aa(cell.x); }
-function coordy(cell) { return "" + (1 + cell.y); }
-
-SudokuSolver.prototype.getcellbynumber = function (number) {
-    for (var y = 0; y < this.my; y++) for (var x = 0; x < this.mx; x++) if (this.m[x][y] && !number--) {
-        return this.m[x][y];
-    }
-}
-
-SudokuSolver.prototype.selector_hide = function (now) {
-    if (now === true) {
-        if (this.timers.selector) {
-            clearTimeout(this.timers.selector);
-            this.timers.selector = false;
-        }
-        $(this.gr.selector).hide();
-        return;
-    }
-    if (this.timers.selector) {
-        return;
-    }
-    var t = this;
-    this.timers.selector = setTimeout(function () {
-        $(t.gr.selector).hide();
-        t.timers.selector = false;
-    }, 1000);
-}
-
-SudokuSolver.prototype.solvelogclear = function (message) {
-    this.loglines = [];
-//    this.nodes.log.html(message ? "<p>" + message + "</p>" : "");
-}
-
-SudokuSolver.prototype.solvelog = function (type, o1, o2, o3, o4) {
-    return;
-    var line, n;
-    n = this.loglines.push(line = {type: type});
-    switch (type) {
-      case 'naked_single':
-        line.cells = o1;
-        if (line.cells.length > 1) {
-            var clist = coord(line.cells[0]) + " — " + this.symb[line.cells[0].digit];
-            for (var i = 1; i < line.cells.length; i++)
-                clist += "; " + coord(line.cells[i]) + " — " + this.symb[line.cells[i].digit];
-            this.nodes.log.append("<p>Naked singles in the cells " + clist + "</p>");
-        } else {
-            this.nodes.log.append("<p>Naked single in the cell " +
-                coord(line.cells[0]) + " — set to " + this.symb[line.cells[0].digit] + "</p>");
-        }
-        break;
-      case 'hidden_single':
-        line.cell = o1;
-        line.house = o2;
-        this.nodes.log.append("<p>Hidden single in the " + line.house.id + "-" +
-            (["column", "row", "box", "diagonal", "antidiagonal"])[line.house.type] + " — set " +
-            coord(line.cell) + " to " + this.symb[line.cell.digit] + "</p>");
-        break;
-      case 'naked_subset':
-        line.cells = o1;
-        line.digits = o2;
-        line.done = o3;
-        var clist = coord(line.cells[0]);
-        for (var i = 1; i < line.cells.length; i++) {
-            clist += ", " + coord(line.cells[i]);
-        }
-        var dlist = this.symb[line.digits[0]];
-        for (var i = 1; i < line.digits.length; i++) {
-            dlist += ", " + this.symb[line.digits[i]];
-        }
-        this.nodes.log.append("<p>Naked " + (['', '', "pair", "triple", "quad"])[line.cells.length] + ": " +
-            clist + " — removing " + dlist + " from common houses</p>");
-        break;
-      default:
-        this.nodes.log.append("<p>" + line.type + "</p>");
-        break;
-    }
-    this.nodes.log.scrollTop(this.nodes.log[0].scrollHeight);
-}
-
-function naked_subset_match(cells) {
-    var have = [], i, j, k;
-    for (i = 0; i < cells.length; i++) for (j = 0; j < cells[i].rcand.length; j++) {
-        for (k = 0; k < have.length; k++) if (have[k] === cells[i].rcand[j]) {
-            break;
-        }
-        if (k === have.length) {
-            have.push(cells[i].rcand[j]);
-        }
-    }
-    return cells.length === have.length ? have : false;
-}
-
-function common_houses(cells) {
-    var t = {}, h = [], i, j;
-    for (i = 0; i < cells.length; i++) for (j = 0; j < cells[i].houses.length; j++) {
-        if (t[cells[i].houses[j].s]) {
-            t[cells[i].houses[j].s][0]++;
-        } else {
-            t[cells[i].houses[j].s] = [1, cells[i].houses[j]];
-        }
-    }
-    for (i in t) if (t[i][0] === cells.length) {
-        h.push(t[i][1]);
-    }
-    return h;
-}
-
-function in_array(arr, value) {
-    for (var i = 0; i < arr.length; i++) if (arr[i] === value) {
-        return true;
-    }
-    return false;
-}
-
-SudokuSolver.prototype.solve_naked_subset = function () {
-    var p, i, j, k, max = Math.floor(this.s / 2), cmax, empty, ret = 0;
-    for (p in this.houses)
-    if ((cmax = this.s - this.houses[p].filled - this.houses[p].ns - 2) > 0) {
-        if (max < cmax) {
-            cmax = max;
-        }
-        for (k = 2; k <= cmax; k++) {
-            for (j = 0, empty = []; j < this.s; j++)
-            if (this.houses[p][j] && !this.houses[p][j].digit &&
-                !this.houses[p][j].solver.ns[this.houses[p].s] &&
-                this.houses[p][j].rcand.length <= k)
-                empty.push(this.houses[p][j]);
-            if (this.solve_naked_subset_rec(this.houses[p], k, empty, [], 0)) {
-                ret++;
-                break;
-            }
-        }
-    }
-    return ret;
-}
-
-SudokuSolver.prototype.solve_naked_subset_rec = function (house, s, cells, m, start) {
-    var i, j, z, k, mm, have, ch, w;
-    for (z = start; z < cells.length; z++) {
-        m.push(cells[z]);
-        if (m.length < s) {
-            if (this.solve_naked_subset_rec(house, s, cells, m, z + 1)) return true;
-            m.pop();
+    SudokuGrid.prototype.loadMap = function(map) {
+      var a, b, c, cell, colHead, colNums, colStart, cols, defs, g, grid, house, i, j, r, rowHead, rowNums, rowStart, rows, stime, vgrids, _i, _j, _k, _l, _len, _len2, _len3, _len4, _len5, _len6, _len7, _m, _n, _o, _ref, _ref10, _ref11, _ref12, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9;
+      stime = (new Date).getTime();
+      if (this.headCell) {
+        this.unloadMap(false);
+      }
+      defs = {
+        w: 3,
+        h: 3,
+        grids: [[0, 0]]
+      };
+      extend(defs, map);
+      this._touched = [];
+      this._history = new DLSet;
+      this._marks = [];
+      this._houseMarks = [];
+      this.w = Math.floor(+defs.w);
+      this.h = Math.floor(+defs.h);
+      if (!((1 <= (_ref = this.w) && _ref <= 100000) && (1 <= (_ref2 = this.h) && _ref2 <= 100000))) {
+        this.w = this.h = 3;
+      }
+      if (this.h === 1) {
+        _ref3 = [this.w, 1], this.h = _ref3[0], this.w = _ref3[1];
+      }
+      this.boxes = this.w !== 1;
+      this.s = this.w * this.h;
+      this.loadSymb(defs.symb);
+      this.mi = this.mj = 0;
+      vgrids = (function() {
+        var _i, _len, _ref4, _results;
+        _ref4 = defs.grids;
+        _results = [];
+        for (_i = 0, _len = _ref4.length; _i < _len; _i++) {
+          grid = _ref4[_i];
+          i = Math.floor(+grid[0]);
+          j = Math.floor(+grid[1]);
+          if (!((0 <= i && i <= 100000) && (0 <= j && j <= 100000)) || this.boxes && (i % this.h || j % this.w)) {
             continue;
+          }
+          if (i + this.s > this.mi) {
+            this.mi = i + this.s;
+          }
+          if (j + this.s > this.mj) {
+            this.mj = j + this.s;
+          }
+          _results.push([i, j]);
         }
-        ch = common_houses(m);
-        if (!ch.length) continue;
-        if (have = naked_subset_match(m)) {
-            for (i = 0, mm = []; i < m.length; i++) mm.push(m[i]);
-            w = [];
-            house.ns += s;
-            for (i = 0; i < mm.length; i++) mm[i].solver.ns[house.s] = true;
-            for (i = 0; i < ch.length; i++) for (j = 0; j < this.s; j++)
-            if (!ch[i][j].digit && !in_array(mm, ch[i][j]))
-            for (k = 0; k < have.length; k++)
-            if (!ch[i][j].cand[have[k]] && !ch[i][j].mask[have[k]]) {
-                ch[i][j].mask[have[k]] = true;
-                w.push(ch[i][j], have[k]);
+        return _results;
+      }).call(this);
+      if (vgrids.length === 0) {
+        vgrids.push([0, 0]);
+        this.mi = this.mj = this.s;
+      }
+      rows = {};
+      cols = {};
+      this.errors = this.filled = this.ufilled = this.total = 0;
+      this.grids = [];
+      this.houses = new HouseList;
+      for (_i = 0, _len = vgrids.length; _i < _len; _i++) {
+        g = vgrids[_i];
+        a = g[0], b = g[1];
+        grid = {};
+        grid.id = this.grids.push(grid) - 1;
+        for (j = b, _ref4 = b + this.s; j < _ref4; j += 1) {
+          for (i = a, _ref5 = a + this.s; i < _ref5; i += 1) {
+            if (!(((_ref6 = rows[i]) != null ? _ref6[j] : void 0) != null)) {
+              if ((_ref7 = rows[i]) == null) {
+                rows[i] = {};
+              }
+              if ((_ref8 = cols[j]) == null) {
+                cols[j] = {};
+              }
+              cols[j][i] = rows[i][j] = new SudokuCell({
+                s: this.s,
+                i: i,
+                j: j,
+                grid: this
+              });
+              rows[i][j].on('set', this._cellSet);
+              rows[i][j].on('unset', this._cellUnset);
+              rows[i][j].on('chsrc', this._cellChsrc);
+              this.total += 1;
             }
-            if (w.length)
-                this.solvelog('naked_subset', mm, have, w);
-            return true;
+          }
         }
-        m.pop();
-    }
-    return false;
-}
-
-SudokuSolver.prototype.validate = function () {
-    var self = this;
-    var err, k, cell;
-    while (self.touched.length) {
-        cell = self.touched.pop();
-        cell.touched = false;
-        if (cell.digit) {
-            err = cell.cand[cell.digit] !== cell.houses.length;
-        } else {
-            for (k = 1, cell.rcand = []; k <= self.s; k += 1) {
-                if (!cell.cand[k] && !cell.mask[k]) {
-                    cell.rcand.push(k);
-                }
+        grid.pos = rows[a][b];
+      }
+      rowNums = [];
+      for (r in rows) {
+        rowNums.push(+r);
+      }
+      rowNums.sort(function(a, b) {
+        return a - b;
+      });
+      colNums = [];
+      for (c in cols) {
+        colNums.push(+c);
+      }
+      colNums.sort(function(a, b) {
+        return a - b;
+      });
+      cell = this.headCell = {};
+      for (_j = 0, _len2 = rowNums.length; _j < _len2; _j++) {
+        i = rowNums[_j];
+        rowHead = false;
+        for (_k = 0, _len3 = colNums.length; _k < _len3; _k++) {
+          j = colNums[_k];
+          if (rows[i][j] != null) {
+            cell.next = rows[i][j];
+            if (!rowHead) {
+              rowHead = rows[i][j];
+            } else {
+              cell.right = rows[i][j];
+              cell.right.left = cell;
             }
-            err = cell.rcand.length === 0;
-            if (cell.rcand.length === 1) { // naked single
-                self.solver.nakedSingles.push(cell);
+            cell.next.prev = cell;
+            cell = cell.next;
+          }
+        }
+        cell.right = rowHead;
+        cell.right.left = cell;
+      }
+      this.tailCell = cell;
+      this.headCell = this.headCell.next;
+      this.headCell.prev = this.tailCell.next = false;
+      for (_l = 0, _len4 = colNums.length; _l < _len4; _l++) {
+        i = colNums[_l];
+        colHead = false;
+        for (_m = 0, _len5 = rowNums.length; _m < _len5; _m++) {
+          j = rowNums[_m];
+          if (cols[i][j] != null) {
+            if (!colHead) {
+              colHead = cols[i][j];
+            } else {
+              cell.bottom = cols[i][j];
+              cell.bottom.top = cell;
             }
-            if (1 <= cell.rcand.length && cell.rcand.length <= 4) {
-                var newCand = cell.rcand.join(" ");
-                if (newCand !== cell.g.cand) {
-                    if (cell.g.cand !== false) {
-                        self.svg.remove($("text", cell.g.node));
-                    }
-                    cell.g.cand = newCand;
-                    self.svg.text(cell.g.node, cell.g.x + 1, cell.g.y + 8,
-                        cell.g.cand, {class_: "cand"});
-                }
-            } else if (cell.g.cand !== false) {
-                self.svg.remove($("text", cell.g.node));
-                cell.g.cand = false;
-            }
+            cell = cols[i][j];
+          }
         }
-        if (err && !cell.error) {
-            cell.error = true;
-            self.errors += 1;
-            if (self.rendered) {
-                $(cell.g.node).addClass('error');
-            }
-        } else if (!err && cell.error) {
-            cell.error = false;
-            self.errors -= 1;
-            if (self.rendered) {
-                $(cell.g.node).removeClass('error');
-            }
+        cell.bottom = colHead;
+        cell.bottom.top = cell;
+      }
+      _ref9 = this.grids;
+      for (_n = 0, _len6 = _ref9.length; _n < _len6; _n++) {
+        grid = _ref9[_n];
+        colStart = rowStart = grid.pos;
+        for (i = 0, _ref10 = this.s; i < _ref10; i += 1) {
+          this.addHouse('col', colStart);
+          this.addHouse('row', rowStart);
+          this.addHouse('box', grid.pos.step((i % this.h) * this.w, Math.floor(i / this.h) * this.h));
+          colStart = colStart.right;
+          rowStart = rowStart.bottom;
         }
-    }
-    if (self.errors && self.state === 0) {
-        self.state = 1;
-        self.upd('state');
-    } else if (self.errors === 0 && self.state === 1) {
-        self.state = 0;
-        self.upd('state');
-    }
-
-    this.upd('stats');
-    return self;
-}
-
-SudokuSolver.prototype.solve2 = function () {
-    var i, k, p, empty, ns, toset = [];
-
-    for (p in this.houses) {
-        for (i = 0, empty = []; i < this.s; i++) if (!this.houses[p][i].digit) empty.push(this.houses[p][i]);
-
-        ns = array([1 + this.s, 2], 0);
-        for (i = 0; i < empty.length; i++) for (k = 1; k <= this.s; k++) {
-            if (empty[i].cand[k] || empty[i].mask[k]) continue;
-            ns[k][0]++; ns[k][1] = empty[i];
+      }
+      if ((defs.houses != null) && defs.houses instanceof Array) {
+        _ref11 = defs.houses;
+        for (_o = 0, _len7 = _ref11.length; _o < _len7; _o++) {
+          house = _ref11[_o];
+          cell = this.getCellByAddr(house.start);
+          if (!cell) {
+            continue;
+          }
+          if ((_ref12 = house.type) === 'diag1' || _ref12 === 'diag2') {
+            this.addHouse(house.type, cell);
+          }
         }
-        for (k = 1; k <= this.s; k++) if (ns[k][0] == 1) // its hidden single
-            toset.push([ns[k][1], k, this.houses[p]]);
-    }
-
-    return toset;
-}
-
-SudokuSolver.prototype.upd = function () {
-    for (var i = 0; i < arguments.length; i++) if (arguments[i]) {
-        this.update_w[arguments[i]] = true;
-    }
-    if (this.timers.update) {
-        return;
-    }
-    var t = this;
-    this.timers.update = setTimeout(function () {
-        var update_w = t.update_w;
-        t.update_w = {};
-        t.timers.update = false;
-        if (update_w.solve) {
-            t.solve();
-        }
-        if (update_w.stats) {
-            t.emit('stats');
-        }
-        if (update_w.update) {
-            t.emit('update');
-        }
-    }, 1);
-}
-
-SudokuSolver.prototype.solve = function () {
-    this.solving = true;
-    this.validate(); // naked singles, errors
-    if (this.solver.nakedSingles.length) {
-        var cells = [];
-        while (this.solver.nakedSingles.length) {
-            var cell = this.solver.nakedSingles.pop();
-            this.select(cell, cell.rcand[0], 'solver');
-            cells.push(cell);
-        }
-        console.log('nakedSingles:', cells)
-        this.solvelog('naked_single', cells);
-        this.upd('solve');
-        return;
-    }
-    if (this.filled === this.total || this.state) {
-        this.solving = false;
-        for (var i = 0; i < this.aftersolve.length; i++) this.aftersolve[i]();
-        this.aftersolve = [];
-        return;
-    }
-    toset = this.solve2(); // hidden singles
-    if (toset.length) {
-        for (var i = 0; i < toset.length; i++) {
-            this.select(toset[i][0], toset[i][1], 'solver');
-            this.solvelog('hidden_single', toset[i][0], toset[i][2]);
-        }
-        this.upd('solve');
-        return;
-    }
-    //if (this.solve_naked_subset()) {
-    //    this.upd('solve');
-    //    return;
-    //}
-    this.solving = false;
-    for (var i = 0; i < this.aftersolve.length; i++) {
-        this.aftersolve[i]();
-    }
-    this.aftersolve = [];
-}
-
-SudokuSolver.prototype.select_user = function (cell) {
-    if (cell.digit && cell.source !== 'user') {
-        if (this.rendered) {
-            $("text", cell.g.node).removeClass(cell.source).addClass('user');
-        }
-        cell.source = 'user';
-        this.ufilled++;
-        this.upd('stats', 'update');
-    }
-    return this;
-}
-
-SudokuSolver.prototype.select = function (cell, k, source, force) {
-    var i, j, p;
-    if (!this.sources[source]) {
-//        this.wlog("unrecognized source: " + source, 'warning');
-        return false;
-    }
-    if (k < 1 || k > this.s || Math.ceil(k) !== k) {
-//        this.wlog(source + " tries to select &gt;" + k + "&lt; at " + coord(cell) + " - its not exists", 'warning');
-        return false;
-    }
-    if (cell.digit) {
-//        this.wlog(source + " tries to select " + this.symb[k] + " at " + coord(cell) + " - its already set to " + this.symb[cell.digit], 'warning');
-        return false;
-    }
-    if (!force && (cell.cand[k] || cell.mask[k])) {
-//        this.wlog(source + " tries to select " + this.symb[k] + " at " + coord(cell) + " - its not possible" + (cell.mask[k] ? " (masked)" : ""), 'warning');
-        return false;
-    }
-    if (this.solving && source !== 'solver') {
-        return false;
-    }
-
-    cell.digit = +k;
-    cell.source = source;
-    this.filled += 1;
-    if (source === 'user') {
-        s.ufilled += 1;
-    }
-
-    for (p in cell.houses) {
-        cell.houses[p].filled += 1;
-        for (i = 0; i < this.s; i += 1) {
-            cell.houses[p][i].cand[k] += 1;
-            if (!cell.houses[p][i].touched) {
-                cell.houses[p][i].touched = true;
-                this.touched.push(cell.houses[p][i]);
-            }
-        }
-    }
-
-    if (this.rendered) {
-        if (cell.g.cand !== false) {
-            this.svg.remove($("text", cell.g.node));
-            cell.g.cand = false;
-        }
-        this.svg.text(cell.g.node,
-            cell.g.x + this.g.tx, cell.g.y + this.g.ty,
-            this.symb[cell.digit], {class_: source});
-    }
-
-    if (this.interactive && cell === this.acell) {
-    //    this.select_next();
-    }
-
-    this.upd('stats', source === 'user' ? 'update' : void 0, source !== 'solver' ? 'solve' : void 0);
-
-    return true;
-}
-
-SudokuSolver.prototype.clear = function () {
-    if (this.solving) {
-        return false;
-    }
-    this.resolve();
-    for (var i = 0; i < this.mx; i++) for (var j = 0; j < this.my; j++) if (this.m[i][j] && this.m[i][j].digit) {
-        this.cancel(this.m[i][j], this.m[i][j].source);
-    }
-}
-
-SudokuSolver.prototype.resolve = function () {
-    var p, i, j, k, cell;
-    for (p in this.houses) {
-        this.houses[p].ns = 0;
-    }
-    for (j = 0; j < this.my; j++) for (i = 0; i < this.mx; i++) if (cell = this.m[i][j]) {
-        cell.solver.ns = {};
-        for (k = 1; k <= this.s; k++) {
-            cell.mask[k] = 0;
-        }
-        if (cell.digit && cell.source === 'solver') {
-            this.cancel(cell, 'solver');
-        }
-    }
-    this.solvelogclear();
-    this.upd('solve');
-}
-
-SudokuSolver.prototype.cancel = function (cell, source) {
-    var self = this;
-    var i, j, k;
-
-    if (!self.isCell(cell)) {
-        throw {errmsg: "No such cell"};
-    }
-    if (cell.digit === 0) {
-        throw {errmsg: source + " tries to cancel " + coord(cell) + " - its empty"};
-    }
-    if (cell.source !== source) {
-        throw {errmsg: source + " tries to cancel " + coord(cell) + " - access denied"};
-    }
-    if (this.solving) {
-        return false;
-    }
-    k = cell.digit;
-    cell.digit = 0;
-    self.filled -= 1;
-    if (source === 'user') {
-        self.ufilled -= 1;
-    }
-
-    for (p in cell.houses) {
-        cell.houses[p].filled -= 1;
-        for (i = 0; i < self.s; i += 1) {
-            cell.houses[p][i].cand[k] -= 1;
-            if (!cell.houses[p][i].touched) {
-                cell.houses[p][i].touched = true;
-                self.touched.push(cell.houses[p][i]);
-            }
-        }
-    }
-
-    if (this.rendered) {
-        self.svg.remove($("text", cell.g.node));
-    }
-    self.upd('stats', source === 'user' ? 'update' : void 0);
-    if (source !== "solver") {
-        self.resolve();
-    }
-
-    return true;
-}
-
-/**  Guess-and-check solver  **/
-
-SudokuSolver.prototype.gnc_start = function () {
-    if (this.gnc) {
-        return;
-    }
-    this.gnc = true;
-    this.gnc_cycle();
-    this.emit('gnc_state');
-}
-SudokuSolver.prototype.gnc_stop = function () {
-    if (!this.gnc) {
-        return;
-    }
-    if (this.timers.gnc) {
-        clearTimeout(this.timers.gnc);
-        this.timers.gnc = false;
-    }
-    this.gnc = false;
-    this.emit('gnc_state');
-}
-SudokuSolver.prototype.gnc_toggle = function () {
-    if (this.gnc) {
-        this.gnc_stop();
-    } else {
-        this.gnc_start();
-    }
-}
-SudokuSolver.prototype.gnc_reset = function () {
-    for (var j = this.my-1; j >= 0; j--) for (var i = this.mx-1; i >= 0; i--) if (
-        this.m[i][j] && this.m[i][j].digit && this.m[i][j].source === 'gnc') {
-        this.cancel(this.m[i][j], 'gnc');
-    }
-}
-
-SudokuSolver.prototype.gnc_cancel = function () {
-    if (!this.gnc || this.timers.gnc) return;
-    var l = false, k, t = this;
-    for (var j = this.my-1; j >= 0; j--) for (var i = this.mx-1; i >= 0; i--) if (
-        this.m[i][j] && this.m[i][j].digit && this.m[i][j].source === 'gnc') {
-        l = this.m[i][j];
-        k = this.m[i][j].digit;
-        i = j = -1;
-    }
-    if (!l) {
-        this.gnc = false;
-        this.emit('gnc_state');
-        return;
-    }
-    this.cancel(l, 'gnc');
-    var next = function () {
-        if (!t.gnc || t.timers.gnc) return;
-        if (t.state) {
-            t.gnc_cancel();
-            return;
-        }
-        while (++k <= t.s && (l.cand[k] || l.mask[k]));
-        if (k === t.s + 1) {
-            t.timers.gnc = setTimeout(function () { t.timers.gnc = false; t.gnc_cancel(); }, t.gnc_speed);
-            return;
-        }
-        t.select(l, k, 'gnc');
-        t.aftersolve.push(function () {
-            t.timers.gnc = setTimeout(function () { t.timers.gnc = false; t.gnc_cycle(); }, t.gnc_speed);
-        });
+      }
+      if (defs.data != null) {
+        this.loadData(defs.data);
+      }
+      if (window.console != null) {
+        console.log("built map in: " + ((new Date()).getTime() - stime));
+      }
+      this.emit('loadMap');
+      return this._changed();
     };
-    this.aftersolve.push(function () {
-        t.timers.gnc = setTimeout(function () { t.timers.gnc = false; next(); }, t.gnc_speed);
-    });
-}
-
-SudokuSolver.prototype.gnc_cycle = function () {
-    if (!this.gnc || this.timers.gnc) return;
-    var t = this;
-    if (this.state) {
-        this.gnc_cancel();
-        return;
-    }
-    if (this.filled === this.total) {
-        this.gnc = false;
-        this.emit('gnc_state');
-        return;
-    }
-    for (var j = 0; j < this.my; j++) for (var i = 0; i < this.mx; i++)
-        if (this.m[i][j] && !this.m[i][j].digit)
-        for (var k = 1; k <= this.s; k++) if (!this.m[i][j].cand[k] && !this.m[i][j].mask[k]) {
-        this.select(this.m[i][j], k, 'gnc');
-        this.aftersolve.push(function () {
-            t.timers.gnc = setTimeout(function () { t.timers.gnc = false; t.gnc_cycle(); }, t.gnc_speed);
+    SudokuGrid.prototype.loadSymb = function(s) {
+      var i, n, _ref, _ref2;
+      this.symbtxt = false;
+      if (typeof s === 'string' && s.length && s.length % this.s === 0) {
+        this.symbtxt = s;
+        n = s.length / this.s;
+        this.symb = [''];
+        for (i = 0, _ref = this.s; i < _ref; i += 1) {
+          this.symb.push(s.substr(i * n, n));
+        }
+      } else if (this.s < 16) {
+        this.symb = ['', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
+      } else {
+        this.symb = ['', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+        for (i = 0, _ref2 = this.s - 10; i < _ref2; i += 1) {
+          this.symb.push(_aa(i));
+        }
+      }
+      this.symbSize = this.symb[this.symb.length - 1].length;
+      this.emit('loadSymb');
+      this._changed();
+      return this;
+    };
+    SudokuGrid.prototype.addHouse = function(type, start) {
+      var cell, house, i, j, scell, _i, _j, _len, _len2, _ref, _ref2, _ref3, _ref4, _ref5, _ref6;
+      if (!this.headCell) {
+        throw new Error('No map loaded');
+      }
+      house = {
+        type: type,
+        filled: 0,
+        length: this.s,
+        s: start.id
+      };
+      house.id = "_" + house.type + "_" + house.s;
+      if (this.houses[house.id] != null) {
+        return this;
+      }
+      switch (house.type) {
+        case 'col':
+          cell = start;
+          for (i = 0, _ref = this.s; i < _ref; i += 1) {
+            house[i] = cell;
+            cell = cell.bottom;
+          }
+          house.p = true;
+          break;
+        case 'row':
+          cell = start;
+          for (i = 0, _ref2 = this.s; i < _ref2; i += 1) {
+            house[i] = cell;
+            cell = cell.right;
+          }
+          house.p = true;
+          break;
+        case 'box':
+          if (!this.boxes) {
+            return this;
+          }
+          for (i = 0, _ref3 = this.w; i < _ref3; i += 1) {
+            for (j = 0, _ref4 = this.h; j < _ref4; j += 1) {
+              house[i * this.h + j] = start.step(i, j);
+            }
+          }
+          house.p = true;
+          break;
+        case 'diag1':
+          cell = start;
+          for (i = 0, _ref5 = this.s; i < _ref5; i += 1) {
+            house[i] = cell;
+            cell = cell.right.bottom;
+          }
+          break;
+        case 'diag2':
+          cell = start;
+          for (i = 0, _ref6 = this.s; i < _ref6; i += 1) {
+            house[i] = cell;
+            cell = cell.left.bottom;
+          }
+          break;
+        default:
+          throw new Error("Unknown house type: " + type);
+      }
+      for (_i = 0, _len = house.length; _i < _len; _i++) {
+        cell = house[_i];
+        cell.houses.add(house);
+        if (!((house.p != null) || cell.touched)) {
+          this._touched.push(cell);
+          cell.touched = true;
+        }
+        if (cell.digit) {
+          for (_j = 0, _len2 = house.length; _j < _len2; _j++) {
+            scell = house[_j];
+            scell.cand[cell.digit] += 1;
+          }
+          house.filled += 1;
+        }
+      }
+      this.houses.add(house);
+      if (house.p == null) {
+        this._history.add({
+          action: 'addHouse',
+          house: house,
+          id: "_addHouse_" + house.id
         });
-        return;
-    }
-    this.gnc = false;
-    this.emit('gnc_state');
-}
+        this.emit('addHouse', house);
+        this._changed();
+      }
+      return this;
+    };
+    SudokuGrid.prototype.getHouse = function(type, start) {
+      var _ref;
+      return (_ref = this.houses["_" + type + "_" + start.id]) != null ? _ref.e : void 0;
+    };
+    SudokuGrid.prototype.delHouse = function(type, start) {
+      var cell, house, scell, _i, _j, _len, _len2;
+      if (!this.headCell) {
+        throw new Error('No map loaded');
+      }
+      house = start != null ? this.getHouse(type, start) : type;
+      if (!house) {
+        throw new Error('No such house');
+      }
+      if (house.p != null) {
+        throw new Error('Can not remove protected houses');
+      }
+      for (_i = 0, _len = house.length; _i < _len; _i++) {
+        cell = house[_i];
+        cell.houses.remove(house);
+        if (!cell.touched) {
+          this._touched.push(cell);
+          cell.touched = true;
+        }
+        if (cell.digit) {
+          for (_j = 0, _len2 = house.length; _j < _len2; _j++) {
+            scell = house[_j];
+            scell.cand[cell.digit] -= 1;
+          }
+        }
+      }
+      this.houses.remove(house);
+      this.emit('delHouse', house);
+      this._history.remove("_addHouse_" + house.id);
+      return this._changed();
+    };
+    SudokuGrid.prototype.getCellByNumber = function(number) {
+      var cell, dir, m, _ref;
+      _ref = number < 0 ? [this.tailCell, 1, 'prev'] : [this.headCell, -1, 'next'], cell = _ref[0], m = _ref[1], dir = _ref[2];
+      while (cell) {
+        if (number === 0) {
+          return cell;
+        }
+        number += m;
+        cell = cell[dir];
+      }
+      return false;
+    };
+    SudokuGrid.prototype.getCellByAddr = function(addr) {
+      var cell, col, i, j, r, row, _;
+      r = addr.match(/^([A-Z]+)(\d+)$/);
+      if (r == null) {
+        return false;
+      }
+      _ = r[0], row = r[1], col = r[2];
+      i = _aa2i(row);
+      j = +col - 1;
+      cell = this.headCell;
+      while (cell) {
+        if (cell.i === i && cell.j === j) {
+          return cell;
+        }
+        cell = cell.next;
+      }
+      return false;
+    };
+    SudokuGrid.prototype.dumpHist = function() {
+      var it, rec;
+      it = this._history.head;
+      while (it) {
+        rec = it.e;
+        console.log(rec.id, rec);
+        it = it.next;
+      }
+    };
+    return SudokuGrid;
+  })();
+  this.SudokuGrid = SudokuGrid;
+}).call(this);
