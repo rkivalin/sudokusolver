@@ -440,7 +440,7 @@
         ny = 0;
       }
       $(this.gr.selector).attr('transform', "translate(" + nx + "," + ny + ")").show();
-      this.gr.selector.scrollIntoViewIfNeeded();
+      //this.gr.selector.scrollIntoViewIfNeeded();
       return this;
     };
     SudokuRenderer.prototype.hideSelector = function(now) {
